@@ -133,12 +133,17 @@ public class ConsultaService {
     }
 
     public List<RetornoPendente> verificarRetornosPendentes() {
-        LocalDateTime seisMesesAtras = LocalDateTime.now().minusMonths(6);
+        LocalDateTime agora = LocalDateTime.now();
+        LocalDateTime seisMesesAtras = agora.minusMonths(6);
         List<Paciente> pacientesComRetornoPendente = consultaRepository.findPacientesComUltimaConsultaAntesDe(seisMesesAtras);
 
         List<RetornoPendente> retornosPendentes = new ArrayList<>();
 
         for (Paciente paciente : pacientesComRetornoPendente) {
+            if (possuiAcompanhamentoFuturo(paciente, agora)) {
+                continue;
+            }
+
             List<Consulta> ultimasConsultas = consultaRepository.findUltimaConsultaRealizadaPorPaciente(paciente);
 
             if (!ultimasConsultas.isEmpty()) {
@@ -148,8 +153,8 @@ public class ConsultaService {
                 retornoPendente.setPaciente(paciente);
                 retornoPendente.setUltimaConsulta(ultimaConsulta);
                 retornoPendente.setDataUltimaConsulta(ultimaConsulta.getDataHora());
-                retornoPendente.setDiasDesdeUltimaConsulta(calcularDiasDesdeUltimaConsulta(ultimaConsulta.getDataHora()));
-                retornoPendente.setPrioridade(calcularPrioridade(ultimaConsulta.getDataHora()));
+                retornoPendente.setDiasDesdeUltimaConsulta(calcularDiasDesdeUltimaConsulta(ultimaConsulta.getDataHora(), agora));
+                retornoPendente.setPrioridade(calcularPrioridade(ultimaConsulta.getDataHora(), agora));
 
                 retornosPendentes.add(retornoPendente);
             }
@@ -158,6 +163,21 @@ public class ConsultaService {
         retornosPendentes.sort((r1, r2) -> Integer.compare(r2.getDiasDesdeUltimaConsulta(), r1.getDiasDesdeUltimaConsulta()));
 
         return retornosPendentes;
+    }
+
+    private boolean possuiAcompanhamentoFuturo(Paciente paciente, LocalDateTime agora) {
+        boolean possuiAgendamentoNaoConfirmado = agendamentoRepository
+                .existsByPacienteAndDataHoraGreaterThanEqualAndConfirmadoFalse(paciente, agora);
+
+        if (possuiAgendamentoNaoConfirmado) {
+            return true;
+        }
+
+        return consultaRepository.existsByPacienteAndDataHoraGreaterThanEqualAndStatusIn(
+                paciente,
+                agora,
+                List.of(StatusConsulta.PENDENTE, StatusConsulta.CONFIRMADA)
+        );
     }
 
     public List<RetornoPendente> verificarRetornosPendentesPorDentista(Long dentistaId) {
@@ -185,12 +205,12 @@ public class ConsultaService {
         return pacientesSemConsulta;
     }
 
-    private int calcularDiasDesdeUltimaConsulta(LocalDateTime dataUltimaConsulta) {
-        return (int) java.time.Duration.between(dataUltimaConsulta, LocalDateTime.now()).toDays();
+    private int calcularDiasDesdeUltimaConsulta(LocalDateTime dataUltimaConsulta, LocalDateTime agora) {
+        return (int) java.time.Duration.between(dataUltimaConsulta, agora).toDays();
     }
 
-    private String calcularPrioridade(LocalDateTime dataUltimaConsulta) {
-        int dias = calcularDiasDesdeUltimaConsulta(dataUltimaConsulta);
+    private String calcularPrioridade(LocalDateTime dataUltimaConsulta, LocalDateTime agora) {
+        int dias = calcularDiasDesdeUltimaConsulta(dataUltimaConsulta, agora);
 
         if (dias >= 365) {
             return "ALTA";

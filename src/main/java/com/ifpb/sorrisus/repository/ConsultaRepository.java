@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
@@ -20,6 +21,12 @@ public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
     boolean existsByDentistaAndDataHoraAndIdNot(Dentista dentista, LocalDateTime dataHora, Long id);
 
     List<Consulta> findByPaciente(Paciente paciente);
+
+    boolean existsByPacienteAndDataHoraGreaterThanEqualAndStatusIn(
+            Paciente paciente,
+            LocalDateTime dataHora,
+            Collection<StatusConsulta> status
+    );
 
     @Query("SELECT c FROM Consulta c WHERE c.paciente = :paciente AND c.status = :status ORDER BY c.dataHora DESC")
     List<Consulta> findLastConsultasByPacienteAndStatus(@Param("paciente") Paciente paciente, @Param("status") StatusConsulta status);

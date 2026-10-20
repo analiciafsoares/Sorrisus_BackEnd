@@ -14,6 +14,11 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
 
     boolean existsByDentistaAndDataHora(Dentista dentista, LocalDateTime dataHora);
 
+    boolean existsByPacienteAndDataHoraGreaterThanEqualAndConfirmadoFalse(
+            Paciente paciente,
+            LocalDateTime dataHora
+    );
+
     List<Agendamento> findByPaciente(Paciente paciente);
 
     List<Agendamento> findByDentista(Dentista dentista);

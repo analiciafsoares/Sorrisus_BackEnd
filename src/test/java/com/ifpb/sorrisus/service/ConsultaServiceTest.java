@@ -10,9 +10,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -125,5 +128,70 @@ class ConsultaServiceTest {
     void deveFalharBuscaInexistente() {
         when(consultaRepository.findById(99L)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.buscarPorId(99L));
+    }
+
+    @Test
+    @DisplayName("Deve manter retorno pendente quando não há acompanhamento futuro ativo")
+    void deveManterRetornoSemAcompanhamentoFuturo() {
+        Consulta ultimaConsulta = criarUltimaConsultaRealizada();
+        when(consultaRepository.findPacientesComUltimaConsultaAntesDe(any())).thenReturn(List.of(paciente));
+        when(agendamentoRepository.existsByPacienteAndDataHoraGreaterThanEqualAndConfirmadoFalse(eq(paciente), any()))
+                .thenReturn(false);
+        when(consultaRepository.existsByPacienteAndDataHoraGreaterThanEqualAndStatusIn(eq(paciente), any(), any()))
+                .thenReturn(false);
+        when(consultaRepository.findUltimaConsultaRealizadaPorPaciente(paciente)).thenReturn(List.of(ultimaConsulta));
+
+        List<RetornoPendente> retornos = service.verificarRetornosPendentes();
+
+        assertEquals(1, retornos.size());
+        assertEquals(ultimaConsulta, retornos.get(0).getUltimaConsulta());
+    }
+
+    @Test
+    @DisplayName("Deve excluir retorno quando há agendamento futuro não confirmado")
+    void deveExcluirRetornoComAgendamentoFuturoNaoConfirmado() {
+        when(consultaRepository.findPacientesComUltimaConsultaAntesDe(any())).thenReturn(List.of(paciente));
+        when(agendamentoRepository.existsByPacienteAndDataHoraGreaterThanEqualAndConfirmadoFalse(eq(paciente), any()))
+                .thenReturn(true);
+
+        List<RetornoPendente> retornos = service.verificarRetornosPendentes();
+
+        assertTrue(retornos.isEmpty());
+        verify(consultaRepository, never()).findUltimaConsultaRealizadaPorPaciente(any());
+    }
+
+    @Test
+    @DisplayName("Deve excluir retorno somente para consultas futuras pendentes ou confirmadas")
+    void deveConsiderarSomenteStatusAtivosNoAcompanhamentoFuturo() {
+        when(consultaRepository.findPacientesComUltimaConsultaAntesDe(any())).thenReturn(List.of(paciente));
+        when(agendamentoRepository.existsByPacienteAndDataHoraGreaterThanEqualAndConfirmadoFalse(eq(paciente), any()))
+                .thenReturn(false);
+        when(consultaRepository.existsByPacienteAndDataHoraGreaterThanEqualAndStatusIn(eq(paciente), any(), any()))
+                .thenReturn(true);
+
+        List<RetornoPendente> retornos = service.verificarRetornosPendentes();
+
+        assertTrue(retornos.isEmpty());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<StatusConsulta>> statusCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(consultaRepository).existsByPacienteAndDataHoraGreaterThanEqualAndStatusIn(
+                eq(paciente),
+                any(),
+                statusCaptor.capture()
+        );
+        assertEquals(List.of(StatusConsulta.PENDENTE, StatusConsulta.CONFIRMADA), List.copyOf(statusCaptor.getValue()));
+        assertFalse(statusCaptor.getValue().contains(StatusConsulta.CANCELADA));
+        assertFalse(statusCaptor.getValue().contains(StatusConsulta.REALIZADA));
+    }
+
+    private Consulta criarUltimaConsultaRealizada() {
+        Consulta ultimaConsulta = new Consulta();
+        ultimaConsulta.setId(20L);
+        ultimaConsulta.setPaciente(paciente);
+        ultimaConsulta.setDentista(dentista);
+        ultimaConsulta.setStatus(StatusConsulta.REALIZADA);
+        ultimaConsulta.setDataHora(LocalDateTime.now().minusMonths(7));
+        return ultimaConsulta;
     }
 }
