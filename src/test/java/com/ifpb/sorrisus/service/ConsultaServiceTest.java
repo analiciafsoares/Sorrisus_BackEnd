@@ -1,5 +1,7 @@
 package com.ifpb.sorrisus.service;
 
+import com.ifpb.sorrisus.controller.ConsultaController;
+import com.ifpb.sorrisus.dto.ConsultaHistoricoRecepcaoDTO;
 import com.ifpb.sorrisus.exception.BusinessException;
 import com.ifpb.sorrisus.exception.ResourceNotFoundException;
 import com.ifpb.sorrisus.model.*;
@@ -12,8 +14,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
+import org.springframework.security.access.prepost.PreAuthorize;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -128,6 +134,51 @@ class ConsultaServiceTest {
     void deveFalharBuscaInexistente() {
         when(consultaRepository.findById(99L)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.buscarPorId(99L));
+    }
+
+    @Test
+    @DisplayName("Deve listar histórico da recepção por data e id decrescentes")
+    void deveListarHistoricoRecepcaoOrdenado() {
+        when(consultaRepository.findAll(any(Sort.class))).thenReturn(List.of(consulta));
+
+        List<Consulta> resultado = service.listarParaRecepcao();
+
+        assertEquals(List.of(consulta), resultado);
+
+        ArgumentCaptor<Sort> sortCaptor = ArgumentCaptor.forClass(Sort.class);
+        verify(consultaRepository).findAll(sortCaptor.capture());
+        Sort ordenacao = sortCaptor.getValue();
+        assertEquals(Sort.Direction.DESC, ordenacao.getOrderFor("dataHora").getDirection());
+        assertEquals(Sort.Direction.DESC, ordenacao.getOrderFor("id").getDirection());
+    }
+
+    @Test
+    @DisplayName("Endpoint da recepção deve ser exclusivo e não expor prontuário")
+    void endpointRecepcaoDeveSerRestritoESemProntuario() throws NoSuchMethodException {
+        paciente.setNome("Paciente Teste");
+        dentista.setNome("Dentista Teste");
+        consulta.setObservacao("Observação permitida");
+        consulta.setProntuario(new Prontuario());
+
+        ConsultaService serviceMock = mock(ConsultaService.class);
+        when(serviceMock.listarParaRecepcao()).thenReturn(List.of(consulta));
+        ConsultaController controller = new ConsultaController(serviceMock);
+
+        List<ConsultaHistoricoRecepcaoDTO> resposta = controller
+                .listarHistoricoParaRecepcao()
+                .getBody();
+
+        assertNotNull(resposta);
+        assertEquals(1, resposta.size());
+        assertEquals("Paciente Teste", resposta.get(0).getNomePaciente());
+        assertEquals("Dentista Teste", resposta.get(0).getNomeDentista());
+        assertTrue(Arrays.stream(ConsultaHistoricoRecepcaoDTO.class.getDeclaredFields())
+                .noneMatch(field -> field.getName().equals("prontuario")));
+
+        Method endpoint = ConsultaController.class.getMethod("listarHistoricoParaRecepcao");
+        PreAuthorize regra = endpoint.getAnnotation(PreAuthorize.class);
+        assertNotNull(regra);
+        assertEquals("hasAuthority('ROLE_RECEPCIONISTA')", regra.value());
     }
 
     @Test

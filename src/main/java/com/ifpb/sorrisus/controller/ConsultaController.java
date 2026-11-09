@@ -1,11 +1,13 @@
 package com.ifpb.sorrisus.controller;
 
 import com.ifpb.sorrisus.dto.ConsultaDTO;
+import com.ifpb.sorrisus.dto.ConsultaHistoricoRecepcaoDTO;
 import com.ifpb.sorrisus.dto.ProntuarioDTO;
 import com.ifpb.sorrisus.dto.RetornoPendenteDTO;
 import com.ifpb.sorrisus.model.*;
 import com.ifpb.sorrisus.service.ConsultaService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
@@ -108,6 +110,15 @@ public class ConsultaController {
         return ResponseEntity.ok(list);
     }
 
+    @GetMapping("/historico/recepcao")
+    @PreAuthorize("hasAuthority('ROLE_RECEPCIONISTA')")
+    public ResponseEntity<List<ConsultaHistoricoRecepcaoDTO>> listarHistoricoParaRecepcao() {
+        List<ConsultaHistoricoRecepcaoDTO> list = service.listarParaRecepcao().stream()
+                .map(this::toHistoricoRecepcaoDTO)
+                .toList();
+        return ResponseEntity.ok(list);
+    }
+
     @GetMapping("/retornos-pendentes")
     public ResponseEntity<List<RetornoPendenteDTO>> listarRetornosPendentes() {
         List<RetornoPendenteDTO> retornos = service.verificarRetornosPendentes()
@@ -169,6 +180,17 @@ public class ConsultaController {
             p.setObservacoes(c.getProntuario().getObservacoes());
             dto.setProntuario(p);
         }
+        return dto;
+    }
+
+    private ConsultaHistoricoRecepcaoDTO toHistoricoRecepcaoDTO(Consulta c) {
+        ConsultaHistoricoRecepcaoDTO dto = new ConsultaHistoricoRecepcaoDTO();
+        dto.setId(c.getId());
+        dto.setDataHora(c.getDataHora());
+        dto.setNomePaciente(c.getPaciente() != null ? c.getPaciente().getNome() : null);
+        dto.setNomeDentista(c.getDentista() != null ? c.getDentista().getNome() : null);
+        dto.setStatus(c.getStatus() != null ? c.getStatus().name() : null);
+        dto.setObservacao(c.getObservacao());
         return dto;
     }
 }

@@ -3,6 +3,7 @@ package com.ifpb.sorrisus.service;
 import com.ifpb.sorrisus.exception.*;
 import com.ifpb.sorrisus.model.*;
 import com.ifpb.sorrisus.repository.*;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -130,6 +131,14 @@ public class ConsultaService {
          Dentista dentista = dentistaRepository.findById(dentistaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Dentista não encontrado."));
         return consultaRepository.findByDentistaAndDataHoraBetween(dentista, LocalDateTime.now().minusYears(1), LocalDateTime.now().plusYears(1));
+    }
+
+    public List<Consulta> listarParaRecepcao() {
+        Sort ordenacao = Sort.by(
+                Sort.Order.desc("dataHora"),
+                Sort.Order.desc("id")
+        );
+        return consultaRepository.findAll(ordenacao);
     }
 
     public List<RetornoPendente> verificarRetornosPendentes() {

@@ -66,8 +66,8 @@ public class ServicoController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
-    public ResponseEntity<Void> excluir(@PathVariable Long id) {
-        service.excluir(id);
+    public ResponseEntity<Void> desativar(@PathVariable Long id) {
+        service.desativar(id);
         return ResponseEntity.noContent().build();
     }
 

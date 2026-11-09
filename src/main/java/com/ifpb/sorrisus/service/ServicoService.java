@@ -51,10 +51,9 @@ public class ServicoService {
     }
 
     @Transactional
-    public void excluir(Long id) {
-        if (!servicoRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Serviço não encontrado.");
-        }
-        servicoRepository.deleteById(id);
+    public void desativar(Long id) {
+        Servico servico = buscarPorId(id);
+        servico.setAtivo(false);
+        servicoRepository.save(servico);
     }
 }

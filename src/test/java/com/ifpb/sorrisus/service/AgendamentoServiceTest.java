@@ -30,6 +30,7 @@ class AgendamentoServiceTest {
     @Mock private PacienteRepository pacienteRepository;
     @Mock private DentistaRepository dentistaRepository;
     @Mock private ConsultaRepository consultaRepository;
+    @Mock private ServicoRepository servicoRepository;
 
     private Agendamento agendamento;
     private Dentista dentista;
@@ -81,6 +82,45 @@ class AgendamentoServiceTest {
     }
 
     @Test
+    @DisplayName("Não deve criar agendamento com serviço inativo")
+    void naoDeveCriarComServicoInativo() {
+        Servico servico = new Servico();
+        servico.setId(5L);
+        servico.setAtivo(false);
+        agendamento.setServicoId(5L);
+
+        when(dentistaRepository.findById(1L)).thenReturn(Optional.of(dentista));
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(servicoRepository.findById(5L)).thenReturn(Optional.of(servico));
+
+        BusinessException erro = assertThrows(BusinessException.class, () -> service.criar(agendamento));
+
+        assertTrue(erro.getMessage().contains("inativo"));
+        verify(agendamentoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve criar agendamento com serviço ativo")
+    void deveCriarComServicoAtivo() {
+        Servico servico = new Servico();
+        servico.setId(5L);
+        servico.setAtivo(true);
+        agendamento.setServicoId(5L);
+
+        when(dentistaRepository.findById(1L)).thenReturn(Optional.of(dentista));
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(servicoRepository.findById(5L)).thenReturn(Optional.of(servico));
+        when(agendamentoRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(false);
+        when(consultaRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(false);
+        when(agendamentoRepository.save(any())).thenReturn(agendamento);
+
+        Agendamento resultado = service.criar(agendamento);
+
+        assertNotNull(resultado);
+        verify(agendamentoRepository).save(agendamento);
+    }
+
+    @Test
     @DisplayName("Deve atualizar agendamento com sucesso")
     void deveAtualizarAgendamento() {
         Agendamento atualizado = new Agendamento();
@@ -98,6 +138,48 @@ class AgendamentoServiceTest {
         
         assertEquals(atualizado.getDataHora(), res.getDataHora());
         verify(agendamentoRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve preservar serviço histórico inativo ao editar agendamento")
+    void devePreservarServicoHistoricoInativo() {
+        agendamento.setServicoId(5L);
+
+        Agendamento atualizado = new Agendamento();
+        atualizado.setDentista(dentista);
+        atualizado.setPaciente(paciente);
+        atualizado.setDataHora(agendamento.getDataHora());
+        atualizado.setServicoId(5L);
+
+        when(agendamentoRepository.findById(1L)).thenReturn(Optional.of(agendamento));
+        when(dentistaRepository.findById(1L)).thenReturn(Optional.of(dentista));
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(agendamentoRepository.save(any())).thenReturn(agendamento);
+
+        service.atualizar(1L, atualizado);
+
+        verify(servicoRepository, never()).findById(anyLong());
+        verify(agendamentoRepository).save(agendamento);
+    }
+
+    @Test
+    @DisplayName("Não deve trocar agendamento para outro serviço inativo")
+    void naoDeveTrocarParaOutroServicoInativo() {
+        agendamento.setServicoId(5L);
+
+        Agendamento atualizado = new Agendamento();
+        atualizado.setServicoId(6L);
+
+        Servico servicoInativo = new Servico();
+        servicoInativo.setId(6L);
+        servicoInativo.setAtivo(false);
+
+        when(agendamentoRepository.findById(1L)).thenReturn(Optional.of(agendamento));
+        when(servicoRepository.findById(6L)).thenReturn(Optional.of(servicoInativo));
+
+        assertThrows(BusinessException.class, () -> service.atualizar(1L, atualizado));
+
+        verify(agendamentoRepository, never()).save(any());
     }
 
     @Test

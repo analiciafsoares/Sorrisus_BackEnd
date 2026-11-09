@@ -16,15 +16,31 @@ public class AgendamentoService {
     private final PacienteRepository pacienteRepository;
     private final DentistaRepository dentistaRepository;
     private final ConsultaRepository consultaRepository;
+    private final ServicoRepository servicoRepository;
 
     public AgendamentoService(AgendamentoRepository agendamentoRepository,
                               PacienteRepository pacienteRepository,
                               DentistaRepository dentistaRepository,
-                              ConsultaRepository consultaRepository) {
+                              ConsultaRepository consultaRepository,
+                              ServicoRepository servicoRepository) {
         this.agendamentoRepository = agendamentoRepository;
         this.pacienteRepository = pacienteRepository;
         this.dentistaRepository = dentistaRepository;
         this.consultaRepository = consultaRepository;
+        this.servicoRepository = servicoRepository;
+    }
+
+    private void validarServicoDisponivel(Long servicoId, Long servicoAtualId) {
+        if (servicoId == null || servicoId.equals(servicoAtualId)) {
+            return;
+        }
+
+        Servico servico = servicoRepository.findById(servicoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado."));
+
+        if (!servico.isAtivo()) {
+            throw new BusinessException("Serviço inativo não pode ser usado em novos agendamentos.");
+        }
     }
 
     private void validarConflito(Dentista dentista, LocalDateTime dataHora, Long agendamentoId) {
@@ -53,6 +69,8 @@ public class AgendamentoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Dentista não encontrado."));
         Paciente paciente = pacienteRepository.findById(agendamento.getPaciente().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Paciente não encontrado."));
+
+        validarServicoDisponivel(agendamento.getServicoId(), null);
         
         validarConflito(dentista, agendamento.getDataHora(), null);
 
@@ -70,6 +88,8 @@ public class AgendamentoService {
         if (existente.isConfirmado()) {
             throw new BusinessException("Não é permitido editar agendamento já confirmado.");
         }
+
+        validarServicoDisponivel(atualizado.getServicoId(), existente.getServicoId());
 
         Dentista dentista = dentistaRepository.findById(atualizado.getDentista().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Dentista não encontrado."));
