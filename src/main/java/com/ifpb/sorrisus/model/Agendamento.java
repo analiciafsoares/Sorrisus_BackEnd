@@ -2,6 +2,8 @@ package com.ifpb.sorrisus.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 @Entity
@@ -24,6 +26,14 @@ public class Agendamento {
     @Column(nullable = false)
     private boolean confirmado = false;
 
+    // Coluna sem NOT NULL para que bancos já existentes recebam a coluna nova sem erro;
+    // registros antigos têm o status derivado de "confirmado" ao serem carregados.
+    // VARCHAR em vez do ENUM nativo do MySQL, para que novos status não exijam alterar a coluna.
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(length = 20)
+    private StatusAgendamento status = StatusAgendamento.PENDENTE;
+
     @ManyToOne
     @JoinColumn(name = "paciente_id", nullable = false)
     private Paciente paciente;
@@ -41,4 +51,11 @@ public class Agendamento {
 
     @Column(length = 1000)
     private String observacao;
+
+    @PostLoad
+    void preencherStatusLegado() {
+        if (status == null) {
+            status = confirmado ? StatusAgendamento.CONFIRMADO : StatusAgendamento.PENDENTE;
+        }
+    }
 }

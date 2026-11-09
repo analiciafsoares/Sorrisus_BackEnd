@@ -101,7 +101,7 @@ Devido à arquitetura aprimorada, o sistema agora separa logicamente os dados de
 O processo inicia com a reserva de um horário na agenda. O sistema valida se o horário está disponível para o dentista selecionado.
 
 * **Endpoint:** `POST /api/agendamentos`
-* **Ação:** Cria uma reserva provisória. O status inicial é "não confirmado".
+* **Ação:** Cria uma reserva provisória com status `PENDENTE`.
 
 ### 2. Confirmar o Agendamento
 Para que o agendamento se torne efetivo, ele deve ser confirmado. Ao confirmar, o sistema **automaticamente gera uma Consulta**.
@@ -127,12 +127,33 @@ No momento do atendimento, o dentista preenche a ficha clínica. O backend utili
     ```
 * **Vantagem:** O frontend envia apenas uma requisição. Se o paciente já possuir anamnese de consultas anteriores, o sistema apenas a atualiza; caso contrário, cria uma nova.
 
+### 4. Encerrar a Consulta
+Nenhum registro é excluído: o encerramento é feito pela mudança de status.
+
+* **Finalizar atendimento** (somente dentista): `POST /api/consultas/{id}/finalizar` → `REALIZADA`. Só é aceito a partir do horário marcado.
+* **Não comparecimento** (dentista ou recepcionista): `POST /api/consultas/{id}/nao-compareceu` → `NAO_COMPARECEU`. Só é aceito depois do horário marcado.
+* **Cancelamento** (dentista ou recepcionista): `POST /api/agendamentos/{id}/cancelar` → agendamento `CANCELADO`; se ele já estava confirmado, a consulta gerada passa para `CANCELADA`. Horários cancelados ficam livres para novos agendamentos.
+
+Somente consultas `REALIZADA` contam para o cálculo de retornos pendentes.
+
+```
+Agendamento: PENDENTE ──confirmar──> CONFIRMADO
+                 └──────cancelar──────> CANCELADO <──cancelar── CONFIRMADO
+
+Consulta (criada na confirmação): CONFIRMADA ──finalizar──────> REALIZADA
+                                             ──não compareceu─> NAO_COMPARECEU
+                                             ──cancelar───────> CANCELADA
+```
+
 ### Resumo dos Endpoints Principais
 
 | Entidade | Ação | Endpoint | Descrição |
 | :--- | :--- | :--- | :--- |
 | **Agendamento** | Agendar | `POST /api/agendamentos` | Reserva o horário. |
 | **Agendamento** | Confirmar | `POST .../{id}/confirmar` | Valida e cria a Consulta. |
+| **Agendamento** | Cancelar | `POST .../{id}/cancelar` | Cancela sem excluir (e cancela a consulta gerada). |
+| **Consulta** | Finalizar | `POST /api/consultas/{id}/finalizar` | Marca como realizada (dentista). |
+| **Consulta** | Não compareceu | `POST /api/consultas/{id}/nao-compareceu` | Registra a falta do paciente. |
 | **Consulta** | Listar | `GET /api/consultas/paciente/{id}` | Histórico de atendimentos. |
 | **Prontuário** | Salvar Ficha | `POST /api/prontuarios` | Salva Anamnese e Prontuário juntos. |
 | **Prontuário** | Buscar | `GET .../consulta/{id}` | Recupera ficha completa da visita. |
@@ -155,6 +176,16 @@ No momento do atendimento, o dentista preenche a ficha clínica. O backend utili
 ```sql
 CREATE DATABASE sorrisus_db;
 ````
+
+#### Atualização de bancos criados antes do fluxo de status
+
+O projeto usa `ddl-auto=update`, que cria colunas novas mas **não altera colunas existentes**. Em bancos criados antes desta versão, a coluna `consultas.status` foi gerada como `ENUM` do MySQL e não aceita o status `NAO_COMPARECEU`. Execute uma vez:
+
+```sql
+ALTER TABLE consultas MODIFY status VARCHAR(20) NOT NULL;
+-- Somente se a coluna agendamentos.status já existir como ENUM:
+ALTER TABLE agendamentos MODIFY status VARCHAR(20) NULL;
+```
 
 -----
 

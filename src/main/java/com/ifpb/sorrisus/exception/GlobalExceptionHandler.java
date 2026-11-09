@@ -8,6 +8,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -80,6 +81,16 @@ public class GlobalExceptionHandler {
         public ResponseEntity<?> handleBadCredentials(BadCredentialsException ex, HttpServletRequest request) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                                 .body(buildResponse(HttpStatus.UNAUTHORIZED, "Credenciais inválidas.",
+                                                request.getRequestURI()));
+        }
+
+        // Sem este handler, o @ExceptionHandler(Exception.class) transformaria o acesso negado
+        // por @PreAuthorize em erro 500.
+        @ExceptionHandler(AccessDeniedException.class)
+        public ResponseEntity<?> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(buildResponse(HttpStatus.FORBIDDEN,
+                                                "Você não tem permissão para acessar este recurso.",
                                                 request.getRequestURI()));
         }
 

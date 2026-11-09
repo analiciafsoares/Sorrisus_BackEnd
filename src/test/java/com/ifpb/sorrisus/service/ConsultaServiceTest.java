@@ -65,8 +65,8 @@ class ConsultaServiceTest {
 
         when(dentistaRepository.findById(1L)).thenReturn(Optional.of(dentista));
         when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
-        when(consultaRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(false);
-        when(agendamentoRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(false);
+        when(consultaRepository.existsByDentistaAndDataHoraAndStatusNot(any(), any(), any())).thenReturn(false);
+        when(agendamentoRepository.existeAgendamentoAtivo(any(), any())).thenReturn(false);
         when(prontuarioRepository.save(any())).thenReturn(new Prontuario()); 
         when(consultaRepository.save(any())).thenReturn(consulta);
 
@@ -91,7 +91,7 @@ class ConsultaServiceTest {
         atualizacao.setDataHora(LocalDateTime.now().plusDays(5)); 
 
         when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
-        when(consultaRepository.existsByDentistaAndDataHoraAndIdNot(any(), any(), eq(10L))).thenReturn(false);
+        when(consultaRepository.existsByDentistaAndDataHoraAndIdNotAndStatusNot(any(), any(), eq(10L), any())).thenReturn(false);
         when(consultaRepository.save(any())).thenReturn(consulta);
 
         service.atualizar(10L, atualizacao);
@@ -107,7 +107,7 @@ class ConsultaServiceTest {
         atualizacao.setDataHora(LocalDateTime.now().plusDays(5));
 
         when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
-        when(consultaRepository.existsByDentistaAndDataHoraAndIdNot(any(), any(), eq(10L))).thenReturn(true);
+        when(consultaRepository.existsByDentistaAndDataHoraAndIdNotAndStatusNot(any(), any(), eq(10L), any())).thenReturn(true);
 
         assertThrows(BusinessException.class, () -> service.atualizar(10L, atualizacao));
     }
@@ -128,7 +128,83 @@ class ConsultaServiceTest {
         service.cancelar(10L);
         assertEquals(StatusConsulta.CANCELADA, consulta.getStatus());
     }
-    
+
+    @Test
+    @DisplayName("Deve cancelar também o agendamento de origem ao cancelar consulta")
+    void deveCancelarAgendamentoDeOrigem() {
+        Agendamento agendamento = new Agendamento();
+        agendamento.setStatus(StatusAgendamento.CONFIRMADO);
+        consulta.setAgendamento(agendamento);
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+
+        service.cancelar(10L);
+
+        assertEquals(StatusAgendamento.CANCELADO, agendamento.getStatus());
+        verify(agendamentoRepository).save(agendamento);
+    }
+
+    @Test
+    @DisplayName("Não deve cancelar consulta já realizada")
+    void naoDeveCancelarRealizada() {
+        consulta.setStatus(StatusConsulta.REALIZADA);
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+
+        assertThrows(BusinessException.class, () -> service.cancelar(10L));
+        assertEquals(StatusConsulta.REALIZADA, consulta.getStatus());
+    }
+
+    @Test
+    @DisplayName("Deve finalizar consulta confirmada cujo horário já chegou")
+    void deveFinalizarConsulta() {
+        consulta.setDataHora(LocalDateTime.now().minusHours(1));
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+        when(consultaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Consulta finalizada = service.finalizar(10L);
+
+        assertEquals(StatusConsulta.REALIZADA, finalizada.getStatus());
+    }
+
+    @Test
+    @DisplayName("Não deve finalizar consulta antes do horário marcado")
+    void naoDeveFinalizarConsultaFutura() {
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+
+        assertThrows(BusinessException.class, () -> service.finalizar(10L));
+        assertEquals(StatusConsulta.CONFIRMADA, consulta.getStatus());
+    }
+
+    @Test
+    @DisplayName("Não deve finalizar consulta cancelada")
+    void naoDeveFinalizarCancelada() {
+        consulta.setStatus(StatusConsulta.CANCELADA);
+        consulta.setDataHora(LocalDateTime.now().minusHours(1));
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+
+        assertThrows(BusinessException.class, () -> service.finalizar(10L));
+    }
+
+    @Test
+    @DisplayName("Deve registrar não comparecimento após o horário da consulta")
+    void deveRegistrarNaoComparecimento() {
+        consulta.setDataHora(LocalDateTime.now().minusHours(2));
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+        when(consultaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Consulta resultado = service.registrarNaoComparecimento(10L);
+
+        assertEquals(StatusConsulta.NAO_COMPARECEU, resultado.getStatus());
+    }
+
+    @Test
+    @DisplayName("Não deve registrar não comparecimento antes do horário da consulta")
+    void naoDeveRegistrarNaoComparecimentoAntesDoHorario() {
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+
+        assertThrows(BusinessException.class, () -> service.registrarNaoComparecimento(10L));
+        assertEquals(StatusConsulta.CONFIRMADA, consulta.getStatus());
+    }
+
     @Test
     @DisplayName("Deve lançar erro ao buscar consulta inexistente")
     void deveFalharBuscaInexistente() {
@@ -186,7 +262,7 @@ class ConsultaServiceTest {
     void deveManterRetornoSemAcompanhamentoFuturo() {
         Consulta ultimaConsulta = criarUltimaConsultaRealizada();
         when(consultaRepository.findPacientesComUltimaConsultaAntesDe(any())).thenReturn(List.of(paciente));
-        when(agendamentoRepository.existsByPacienteAndDataHoraGreaterThanEqualAndConfirmadoFalse(eq(paciente), any()))
+        when(agendamentoRepository.existeAgendamentoPendenteFuturo(eq(paciente), any()))
                 .thenReturn(false);
         when(consultaRepository.existsByPacienteAndDataHoraGreaterThanEqualAndStatusIn(eq(paciente), any(), any()))
                 .thenReturn(false);
@@ -202,7 +278,7 @@ class ConsultaServiceTest {
     @DisplayName("Deve excluir retorno quando há agendamento futuro não confirmado")
     void deveExcluirRetornoComAgendamentoFuturoNaoConfirmado() {
         when(consultaRepository.findPacientesComUltimaConsultaAntesDe(any())).thenReturn(List.of(paciente));
-        when(agendamentoRepository.existsByPacienteAndDataHoraGreaterThanEqualAndConfirmadoFalse(eq(paciente), any()))
+        when(agendamentoRepository.existeAgendamentoPendenteFuturo(eq(paciente), any()))
                 .thenReturn(true);
 
         List<RetornoPendente> retornos = service.verificarRetornosPendentes();
@@ -215,7 +291,7 @@ class ConsultaServiceTest {
     @DisplayName("Deve excluir retorno somente para consultas futuras pendentes ou confirmadas")
     void deveConsiderarSomenteStatusAtivosNoAcompanhamentoFuturo() {
         when(consultaRepository.findPacientesComUltimaConsultaAntesDe(any())).thenReturn(List.of(paciente));
-        when(agendamentoRepository.existsByPacienteAndDataHoraGreaterThanEqualAndConfirmadoFalse(eq(paciente), any()))
+        when(agendamentoRepository.existeAgendamentoPendenteFuturo(eq(paciente), any()))
                 .thenReturn(false);
         when(consultaRepository.existsByPacienteAndDataHoraGreaterThanEqualAndStatusIn(eq(paciente), any(), any()))
                 .thenReturn(true);

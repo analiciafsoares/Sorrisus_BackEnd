@@ -82,6 +82,18 @@ public class ConsultaController {
         return ResponseEntity.ok(toDTO(salvo));
     }
 
+    @PostMapping("/{id}/finalizar")
+    @PreAuthorize("hasRole('DENTISTA')")
+    public ResponseEntity<ConsultaDTO> finalizar(@PathVariable Long id) {
+        return ResponseEntity.ok(toDTO(service.finalizar(id)));
+    }
+
+    @PostMapping("/{id}/nao-compareceu")
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
+    public ResponseEntity<ConsultaDTO> registrarNaoComparecimento(@PathVariable Long id) {
+        return ResponseEntity.ok(toDTO(service.registrarNaoComparecimento(id)));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> cancelar(@PathVariable Long id) {
         service.cancelar(id);

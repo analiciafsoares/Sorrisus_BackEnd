@@ -1,5 +1,6 @@
 package com.ifpb.sorrisus.repository;
 
+import com.ifpb.sorrisus.model.Agendamento;
 import com.ifpb.sorrisus.model.Consulta;
 import com.ifpb.sorrisus.model.Dentista;
 import com.ifpb.sorrisus.model.Paciente;
@@ -11,14 +12,19 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
 
     List<Consulta> findByDentistaAndDataHoraBetween(Dentista dentista, LocalDateTime start, LocalDateTime end);
 
-    boolean existsByDentistaAndDataHora(Dentista dentista, LocalDateTime dataHora);
+    // Usados na verificação de conflito: consultas canceladas liberam o horário.
+    boolean existsByDentistaAndDataHoraAndStatusNot(Dentista dentista, LocalDateTime dataHora, StatusConsulta status);
 
-    boolean existsByDentistaAndDataHoraAndIdNot(Dentista dentista, LocalDateTime dataHora, Long id);
+    boolean existsByDentistaAndDataHoraAndIdNotAndStatusNot(Dentista dentista, LocalDateTime dataHora, Long id,
+                                                            StatusConsulta status);
+
+    Optional<Consulta> findByAgendamento(Agendamento agendamento);
 
     List<Consulta> findByPaciente(Paciente paciente);
 

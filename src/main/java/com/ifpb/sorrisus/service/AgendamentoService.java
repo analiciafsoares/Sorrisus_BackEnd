@@ -47,12 +47,13 @@ public class AgendamentoService {
         boolean conflitoAgendamento;
         
         if (agendamentoId == null) {
-            conflitoAgendamento = agendamentoRepository.existsByDentistaAndDataHora(dentista, dataHora);
+            conflitoAgendamento = agendamentoRepository.existeAgendamentoAtivo(dentista, dataHora);
         } else {
-            conflitoAgendamento = agendamentoRepository.existsByDentistaAndDataHoraAndIdNot(dentista, dataHora, agendamentoId);
+            conflitoAgendamento = agendamentoRepository.existeOutroAgendamentoAtivo(dentista, dataHora, agendamentoId);
         }
 
-        boolean conflitoConsulta = consultaRepository.existsByDentistaAndDataHora(dentista, dataHora);
+        boolean conflitoConsulta = consultaRepository.existsByDentistaAndDataHoraAndStatusNot(
+                dentista, dataHora, StatusConsulta.CANCELADA);
 
         if (conflitoAgendamento || conflitoConsulta) {
             throw new BusinessException("Dentista já possui compromisso (Agendamento ou Consulta) neste horário.");
@@ -77,6 +78,7 @@ public class AgendamentoService {
         agendamento.setDentista(dentista);
         agendamento.setPaciente(paciente);
         agendamento.setConfirmado(false);
+        agendamento.setStatus(StatusAgendamento.PENDENTE);
 
         return agendamentoRepository.save(agendamento);
     }
@@ -85,8 +87,8 @@ public class AgendamentoService {
     public Agendamento atualizar(Long id, Agendamento atualizado) {
         Agendamento existente = buscarPorId(id);
 
-        if (existente.isConfirmado()) {
-            throw new BusinessException("Não é permitido editar agendamento já confirmado.");
+        if (existente.getStatus() != StatusAgendamento.PENDENTE) {
+            throw new BusinessException("Somente agendamentos pendentes podem ser editados.");
         }
 
         validarServicoDisponivel(atualizado.getServicoId(), existente.getServicoId());
@@ -113,27 +115,58 @@ public class AgendamentoService {
     public Agendamento confirmar(Long id) {
         Agendamento agendamento = buscarPorId(id);
 
-        if (agendamento.isConfirmado()) {
-            throw new BusinessException("Agendamento já confirmado.");
+        if (agendamento.getStatus() != StatusAgendamento.PENDENTE) {
+            throw new BusinessException("Somente agendamentos pendentes podem ser confirmados.");
         }
 
-        if (consultaRepository.existsByDentistaAndDataHora(agendamento.getDentista(), agendamento.getDataHora())) {
+        if (consultaRepository.existsByDentistaAndDataHoraAndStatusNot(
+                agendamento.getDentista(), agendamento.getDataHora(), StatusConsulta.CANCELADA)) {
              throw new BusinessException("Já existe uma consulta registrada para este horário.");
         }
 
         agendamento.setConfirmado(true);
+        agendamento.setStatus(StatusAgendamento.CONFIRMADO);
         Agendamento salvo = agendamentoRepository.save(agendamento);
 
         Consulta consulta = new Consulta();
         consulta.setDataHora(agendamento.getDataHora());
         consulta.setDentista(agendamento.getDentista());
         consulta.setPaciente(agendamento.getPaciente());
-        consulta.setStatus(StatusConsulta.CONFIRMADA); 
+        consulta.setStatus(StatusConsulta.CONFIRMADA);
         consulta.setObservacao("Criada a partir do agendamento id=" + agendamento.getId());
-        
+        consulta.setAgendamento(salvo);
+
         consultaRepository.save(consulta);
 
         return salvo;
+    }
+
+    /**
+     * Cancela o agendamento sem excluí-lo. Se ele já tiver sido confirmado, a consulta
+     * gerada também é cancelada, desde que o atendimento ainda não tenha sido encerrado.
+     */
+    @Transactional
+    public Agendamento cancelar(Long id) {
+        Agendamento agendamento = buscarPorId(id);
+
+        if (agendamento.getStatus() == StatusAgendamento.CANCELADO) {
+            throw new BusinessException("Agendamento já cancelado.");
+        }
+
+        if (agendamento.getStatus() == StatusAgendamento.CONFIRMADO) {
+            consultaRepository.findByAgendamento(agendamento).ifPresent(consulta -> {
+                if (consulta.getStatus() == StatusConsulta.REALIZADA
+                        || consulta.getStatus() == StatusConsulta.NAO_COMPARECEU) {
+                    throw new BusinessException(
+                            "Não é possível cancelar: o atendimento deste agendamento já foi encerrado.");
+                }
+                consulta.setStatus(StatusConsulta.CANCELADA);
+                consultaRepository.save(consulta);
+            });
+        }
+
+        agendamento.setStatus(StatusAgendamento.CANCELADO);
+        return agendamentoRepository.save(agendamento);
     }
 
     public Agendamento buscarPorId(Long id) {
