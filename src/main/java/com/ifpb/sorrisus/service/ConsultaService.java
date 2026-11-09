@@ -36,12 +36,14 @@ public class ConsultaService {
         boolean conflitoConsulta;
 
         if (consultaId == null) {
-            conflitoConsulta = consultaRepository.existsByDentistaAndDataHora(dentista, dataHora);
+            conflitoConsulta = consultaRepository.existsByDentistaAndDataHoraAndStatusNot(
+                    dentista, dataHora, StatusConsulta.CANCELADA);
         } else {
-            conflitoConsulta = consultaRepository.existsByDentistaAndDataHoraAndIdNot(dentista, dataHora, consultaId);
+            conflitoConsulta = consultaRepository.existsByDentistaAndDataHoraAndIdNotAndStatusNot(
+                    dentista, dataHora, consultaId, StatusConsulta.CANCELADA);
         }
 
-        boolean conflitoAgendamento = agendamentoRepository.existsByDentistaAndDataHora(dentista, dataHora);
+        boolean conflitoAgendamento = agendamentoRepository.existeAgendamentoAtivo(dentista, dataHora);
 
         if (conflitoConsulta || conflitoAgendamento) {
             throw new BusinessException("Horário indisponível. Existe um Agendamento ou Consulta para este dentista.");
@@ -109,11 +111,58 @@ public class ConsultaService {
         return consultaRepository.save(existente);
     }
 
+    /**
+     * Cancela a consulta sem excluí-la. O agendamento que a originou, se houver,
+     * também passa a cancelado.
+     */
     @Transactional
     public void cancelar(Long id) {
         Consulta consulta = buscarPorId(id);
+        exigirStatusAtivo(consulta, "cancelar");
+
         consulta.setStatus(StatusConsulta.CANCELADA);
         consultaRepository.save(consulta);
+
+        Agendamento agendamento = consulta.getAgendamento();
+        if (agendamento != null) {
+            agendamento.setStatus(StatusAgendamento.CANCELADO);
+            agendamentoRepository.save(agendamento);
+        }
+    }
+
+    /** Encerra o atendimento como realizado. Só o dentista finaliza (ver ConsultaController). */
+    @Transactional
+    public Consulta finalizar(Long id) {
+        Consulta consulta = buscarPorId(id);
+        exigirStatusAtivo(consulta, "finalizar");
+
+        if (consulta.getDataHora().isAfter(LocalDateTime.now())) {
+            throw new BusinessException("Não é possível finalizar uma consulta antes do horário marcado.");
+        }
+
+        consulta.setStatus(StatusConsulta.REALIZADA);
+        return consultaRepository.save(consulta);
+    }
+
+    /** Registra manualmente que o paciente não compareceu a uma consulta cujo horário já passou. */
+    @Transactional
+    public Consulta registrarNaoComparecimento(Long id) {
+        Consulta consulta = buscarPorId(id);
+        exigirStatusAtivo(consulta, "registrar o não comparecimento de");
+
+        if (!consulta.getDataHora().isBefore(LocalDateTime.now())) {
+            throw new BusinessException("O não comparecimento só pode ser registrado após o horário da consulta.");
+        }
+
+        consulta.setStatus(StatusConsulta.NAO_COMPARECEU);
+        return consultaRepository.save(consulta);
+    }
+
+    private void exigirStatusAtivo(Consulta consulta, String acao) {
+        if (consulta.getStatus() != StatusConsulta.CONFIRMADA && consulta.getStatus() != StatusConsulta.PENDENTE) {
+            throw new BusinessException("Não é possível " + acao + " uma consulta com status "
+                    + consulta.getStatus() + ".");
+        }
     }
 
     public Consulta buscarPorId(Long id) {
@@ -176,7 +225,7 @@ public class ConsultaService {
 
     private boolean possuiAcompanhamentoFuturo(Paciente paciente, LocalDateTime agora) {
         boolean possuiAgendamentoNaoConfirmado = agendamentoRepository
-                .existsByPacienteAndDataHoraGreaterThanEqualAndConfirmadoFalse(paciente, agora);
+                .existeAgendamentoPendenteFuturo(paciente, agora);
 
         if (possuiAgendamentoNaoConfirmado) {
             return true;

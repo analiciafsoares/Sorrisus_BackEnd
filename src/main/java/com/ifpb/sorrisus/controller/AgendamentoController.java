@@ -8,6 +8,7 @@ import com.ifpb.sorrisus.repository.DentistaRepository;
 import com.ifpb.sorrisus.repository.PacienteRepository;
 import com.ifpb.sorrisus.service.WhatsAppService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.time.format.DateTimeFormatter;
@@ -97,6 +98,13 @@ public class AgendamentoController {
         return ResponseEntity.ok(toDTO(confirmado));
     }
 
+    @PostMapping("/{id}/cancelar")
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
+    public ResponseEntity<AgendamentoDTO> cancelar(@PathVariable Long id) {
+        Agendamento cancelado = service.cancelar(id);
+        return ResponseEntity.ok(toDTO(cancelado));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<AgendamentoDTO> buscarPorId(@PathVariable Long id) {
         Agendamento a = service.buscarPorId(id);
@@ -123,6 +131,7 @@ public class AgendamentoController {
         dto.setDentistaId(a.getDentista().getId());
         dto.setServicoId(a.getServicoId());
         dto.setConfirmado(a.isConfirmado());
+        dto.setStatus(a.getStatus() != null ? a.getStatus().name() : null);
         dto.setObservacao(a.getObservacao());
         if (a.getCriadoPor() != null) dto.setRecepcionistaId(a.getCriadoPor().getId());
         return dto;

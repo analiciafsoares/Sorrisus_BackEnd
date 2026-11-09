@@ -20,5 +20,7 @@ public class AgendamentoDTO {
     private Long servicoId;
     private Long recepcionistaId;
     private Boolean confirmado;
+
+    private String status;
     private String observacao;
 }
