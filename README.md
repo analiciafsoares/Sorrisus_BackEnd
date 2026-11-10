@@ -37,7 +37,15 @@ O token expira após o tempo definido em `JWT_EXPIRATION_MS`. A resposta do logi
 
 Todas as demais rotas **exigem autenticação**.
 
-> **O paciente não se autocadastra.** O cadastro de pacientes (`POST /api/pacientes/cadastro`) exige login de dentista ou recepcionista.
+> **O paciente não se autocadastra.** O cadastro de pacientes (`POST /api/pacientes/cadastro`) exige login de dentista ou recepcionista. A equipe não precisa definir a senha: quando o campo `senha` não é enviado, a **senha inicial é o CPF do paciente (somente números)**. O paciente deve trocá-la no primeiro acesso.
+
+### Alterar a própria senha
+
+Qualquer usuário autenticado pode trocar a sua senha:
+
+* **Endpoint:** `PUT /api/usuarios/me/senha`
+* **Corpo:** `{ "senhaAtual": "...", "novaSenha": "..." }`
+* **Regras:** o usuário é identificado pelo token (ninguém altera a senha de outra pessoa); a senha atual precisa conferir; a nova senha deve ter pelo menos 6 caracteres e ser diferente da atual. Responde **204** em caso de sucesso.
 >
 > As rotas de cadastro de usuários, dentistas e recepcionistas ainda são públicas. Pelas regras do sistema, o cadastro de profissionais deve ser feito apenas por um dentista; essa restrição está pendente.
 
@@ -54,6 +62,7 @@ Além de exigir login, alguns endpoints são restritos por perfil (`@PreAuthoriz
 | Finalizar atendimento | Dentista |
 | Salvar e excluir ficha clínica (prontuário/anamnese) | Dentista |
 | Histórico de consultas da clínica (`/consultas/historico/recepcao`) | Recepcionista |
+| Alterar a própria senha (`/usuarios/me/senha`) | Qualquer usuário autenticado |
 | Demais consultas (listagens, buscas por ID, retornos pendentes) | Qualquer usuário autenticado |
 
 Os perfis existentes são `ROLE_DENTISTA`, `ROLE_RECEPCIONISTA` e `ROLE_PACIENTE`. O paciente não cria nem altera agendamentos: ele apenas consulta os próprios dados.
@@ -389,6 +398,7 @@ Incluem testes das regras de negócio dos serviços (agendamentos, consultas, se
   * Emissão de receituário
   * Relatórios gerenciais
   * Recuperação de senha
+  * Exigir a troca da senha inicial no primeiro acesso (ou envio de link para definição de senha)
   * Bloqueio de login após tentativas inválidas
   * Lembrete de consulta 24 horas antes
 

@@ -69,6 +69,41 @@
             "description": "Rota pública (sem token). O token retornado é salvo na variável {{token}} e usado por todas as outras requisições. Faça login com o perfil adequado antes de testar rotas restritas."
           },
           "response": []
+        },
+        {
+          "name": "Alterar a própria senha",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senhaAtual\": \"senha_atual\",\n  \"novaSenha\": \"nova_senha\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/me/senha",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "me",
+                "senha"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado. Altera a senha do usuário dono do token (não é possível alterar a de outra pessoa). Exige a senha atual; a nova deve ter pelo menos 6 caracteres e ser diferente da atual. Responde 204."
+          },
+          "response": []
         }
       ]
     },
@@ -582,7 +617,7 @@
                 "cadastro"
               ]
             },
-            "description": "Perfis: dentista ou recepcionista. O paciente não se autocadastra: o cadastro é feito pela equipe da clínica.",
+            "description": "Perfis: dentista ou recepcionista. O paciente não se autocadastra: o cadastro é feito pela equipe da clínica. O campo \"senha\" é opcional: se não for enviado, a senha inicial é o CPF (somente números), que o paciente deve trocar no primeiro acesso.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"nome\": \"Carlos Souza\",\n  \"email\": \"carlos.souza@sorrisus.com\",\n  \"senha\": \"senhaSegura123\",\n  \"cpf\": \"12345678901\",\n  \"telefone\": \"83998887777\",\n  \"dataNascimento\": \"1990-05-10\",\n  \"role\": \"ROLE_PACIENTE\"\n}",

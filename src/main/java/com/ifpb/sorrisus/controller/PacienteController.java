@@ -38,7 +38,10 @@ public class PacienteController {
     @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
     public ResponseEntity<Paciente> criar(@RequestBody Paciente paciente) {
         paciente.setRole(Role.ROLE_PACIENTE);
-        paciente.setSenha(passwordEncoder.encode(paciente.getSenha()));
+        String senhaInicial = paciente.getSenha() == null || paciente.getSenha().isBlank()
+                ? paciente.getCpf()
+                : paciente.getSenha();
+        paciente.setSenha(senhaInicial == null ? null : passwordEncoder.encode(senhaInicial));
         return ResponseEntity.ok(service.salvar(paciente));
     }
 
