@@ -4,6 +4,7 @@ import com.ifpb.sorrisus.model.Paciente;
 import com.ifpb.sorrisus.model.Role;
 import com.ifpb.sorrisus.service.PacienteService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,9 +35,13 @@ public class PacienteController {
     }
 
     @PostMapping("/cadastro")
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
     public ResponseEntity<Paciente> criar(@RequestBody Paciente paciente) {
         paciente.setRole(Role.ROLE_PACIENTE);
-        paciente.setSenha(passwordEncoder.encode(paciente.getSenha()));
+        String senhaInicial = paciente.getSenha() == null || paciente.getSenha().isBlank()
+                ? paciente.getCpf()
+                : paciente.getSenha();
+        paciente.setSenha(senhaInicial == null ? null : passwordEncoder.encode(senhaInicial));
         return ResponseEntity.ok(service.salvar(paciente));
     }
 

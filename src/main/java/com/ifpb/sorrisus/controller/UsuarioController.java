@@ -1,8 +1,11 @@
 package com.ifpb.sorrisus.controller;
 
+import com.ifpb.sorrisus.dto.AlterarSenhaDTO;
 import com.ifpb.sorrisus.model.Usuario;
 import com.ifpb.sorrisus.service.UsuarioService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,6 +48,12 @@ public class UsuarioController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/me/senha")
+    public ResponseEntity<Void> alterarSenha(@Valid @RequestBody AlterarSenhaDTO dto, Authentication authentication) {
+        service.alterarSenha(authentication.getName(), dto.getSenhaAtual(), dto.getNovaSenha());
         return ResponseEntity.noContent().build();
     }
 }

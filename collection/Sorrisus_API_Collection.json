@@ -1,16 +1,26 @@
 {
   "info": {
-    "name": "Sorrisus API - CRUDs",
     "_postman_id": "e015f3c9-f79d-45ef-9e09-f07cb33694a9",
-    "description": "Coleção completa para testar os CRUDs e Auth do sistema Sorrisus.",
+    "name": "Sorrisus API",
+    "description": "Coleção para testar a API do Sorrisus.\n\n1. Ajuste {{base_url}} se necessário.\n2. Execute \"Login\" com o perfil desejado: o token é salvo em {{token}} e enviado automaticamente.\n3. As requisições de criação salvam o ID criado nas variáveis ({{pacienteId}}, {{agendamentoId}}, ...). Para usar registros existentes, edite as variáveis da coleção.\n\nA descrição de cada requisição informa o perfil exigido. Fluxo sugerido: criar agendamento → confirmar → buscar a consulta gerada (consultas por dentista) → salvar ficha → finalizar.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
   },
   "item": [
     {
-      "name": "Auth",
+      "name": "🔐 Auth",
       "item": [
         {
-          "name": "Login (gerar token JWT)",
+          "name": "Login (gera e salva o token JWT)",
           "event": [
             {
               "listen": "test",
@@ -52,7 +62,46 @@
                 "auth",
                 "login"
               ]
-            }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Rota pública (sem token). O token retornado é salvo na variável {{token}} e usado por todas as outras requisições. Faça login com o perfil adequado antes de testar rotas restritas."
+          },
+          "response": []
+        },
+        {
+          "name": "Alterar a própria senha",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senhaAtual\": \"senha_atual\",\n  \"novaSenha\": \"nova_senha\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/usuarios/me/senha",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "me",
+                "senha"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado. Altera a senha do usuário dono do token (não é possível alterar a de outra pessoa). Exige a senha atual; a nova deve ter pelo menos 6 caracteres e ser diferente da atual. Responde 204."
           },
           "response": []
         }
@@ -65,12 +114,7 @@
           "name": "Listar usuários",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/usuarios",
               "host": [
@@ -80,7 +124,8 @@
                 "api",
                 "usuarios"
               ]
-            }
+            },
+            "description": "Perfil: qualquer usuário autenticado."
           },
           "response": []
         },
@@ -88,28 +133,24 @@
           "name": "Buscar usuário por ID",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/api/usuarios/1",
+              "raw": "{{base_url}}/api/usuarios/{{usuarioId}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "usuarios",
-                "1"
+                "{{usuarioId}}"
               ]
-            }
+            },
+            "description": "Perfil: qualquer usuário autenticado."
           },
           "response": []
         },
         {
-          "name": "Criar usuário",
+          "name": "Cadastrar usuário",
           "request": {
             "method": "POST",
             "header": [
@@ -118,10 +159,6 @@
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"João Pereira\",\n  \"email\": \"joao.pereira@sorrisus.com\",\n  \"senha\": \"12345678\",\n  \"role\": \"ROLE_RECEPCIONISTA\"\n}"
-            },
             "url": {
               "raw": "{{base_url}}/api/usuarios/cadastro",
               "host": [
@@ -132,9 +169,36 @@
                 "usuarios",
                 "cadastro"
               ]
+            },
+            "description": "Rota pública (sem token). Atenção: hoje este cadastro é público; a restrição faz parte das correções de segurança pendentes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Pereira\",\n  \"email\": \"joao.pereira@sorrisus.com\",\n  \"senha\": \"12345678\",\n  \"role\": \"ROLE_RECEPCIONISTA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
             }
           },
-          "response": []
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.id) pm.collectionVariables.set(\"usuarioId\", json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Atualizar usuário",
@@ -144,51 +208,49 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"João Marcos Pereira\",\n  \"email\": \"joao.marcos@sorrisus.com\",\n  \"senha\": \"senhaNova123\",\n  \"role\": \"ROLE_RECEPCIONISTA\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/api/usuarios/1",
+              "raw": "{{base_url}}/api/usuarios/{{usuarioId}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "usuarios",
-                "1"
+                "{{usuarioId}}"
               ]
+            },
+            "description": "Perfil: qualquer usuário autenticado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Marcos Pereira\",\n  \"email\": \"joao.marcos@sorrisus.com\",\n  \"senha\": \"senhaNova123\",\n  \"role\": \"ROLE_RECEPCIONISTA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
         },
         {
-          "name": "Deletar usuário",
+          "name": "Excluir usuário",
           "request": {
             "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/api/usuarios/1",
+              "raw": "{{base_url}}/api/usuarios/{{usuarioId}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "usuarios",
-                "1"
+                "{{usuarioId}}"
               ]
-            }
+            },
+            "description": "Perfil: qualquer usuário autenticado."
           },
           "response": []
         }
@@ -201,12 +263,7 @@
           "name": "Listar dentistas",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/dentistas",
               "host": [
@@ -216,7 +273,8 @@
                 "api",
                 "dentistas"
               ]
-            }
+            },
+            "description": "Perfil: qualquer usuário autenticado."
           },
           "response": []
         },
@@ -224,28 +282,24 @@
           "name": "Buscar dentista por ID",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/api/dentistas/1",
+              "raw": "{{base_url}}/api/dentistas/{{dentistaId}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "dentistas",
-                "1"
+                "{{dentistaId}}"
               ]
-            }
+            },
+            "description": "Perfil: qualquer usuário autenticado."
           },
           "response": []
         },
         {
-          "name": "Criar dentista",
+          "name": "Cadastrar dentista",
           "request": {
             "method": "POST",
             "header": [
@@ -254,10 +308,6 @@
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Dra. Ana Paula\",\n  \"email\": \"ana.paula@sorrisus.com\",\n  \"senha\": \"senhaSegura123\",\n  \"cro\": \"98765-PB\",\n  \"especialidade\": \"Ortodontia\",\n  \"role\": \"ROLE_DENTISTA\"\n}"
-            },
             "url": {
               "raw": "{{base_url}}/api/dentistas/cadastro",
               "host": [
@@ -268,9 +318,36 @@
                 "dentistas",
                 "cadastro"
               ]
+            },
+            "description": "Rota pública (sem token). Atenção: hoje este cadastro é público; a restrição faz parte das correções de segurança pendentes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Dra. Ana Paula\",\n  \"email\": \"ana.paula@sorrisus.com\",\n  \"senha\": \"senhaSegura123\",\n  \"cro\": \"98765-PB\",\n  \"especialidade\": \"Ortodontia\",\n  \"role\": \"ROLE_DENTISTA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
             }
           },
-          "response": []
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.id) pm.collectionVariables.set(\"dentistaId\", json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Atualizar dentista",
@@ -280,187 +357,49 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Dra. Ana Paula Nunes\",\n  \"email\": \"ana.nunes@sorrisus.com\",\n  \"senha\": \"novaSenha123\",\n  \"cro\": \"98765-PB\",\n  \"especialidade\": \"Implantodontia\",\n  \"role\": \"ROLE_DENTISTA\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/api/dentistas/1",
+              "raw": "{{base_url}}/api/dentistas/{{dentistaId}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "dentistas",
-                "1"
+                "{{dentistaId}}"
               ]
+            },
+            "description": "Perfil: qualquer usuário autenticado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Dra. Ana Paula Nunes\",\n  \"email\": \"ana.nunes@sorrisus.com\",\n  \"senha\": \"novaSenha123\",\n  \"cro\": \"98765-PB\",\n  \"especialidade\": \"Implantodontia\",\n  \"role\": \"ROLE_DENTISTA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
         },
         {
-          "name": "Deletar dentista",
+          "name": "Excluir dentista",
           "request": {
             "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/api/dentistas/1",
+              "raw": "{{base_url}}/api/dentistas/{{dentistaId}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "dentistas",
-                "1"
+                "{{dentistaId}}"
               ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "🧾 Paciente",
-      "item": [
-        {
-          "name": "Listar pacientes",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/pacientes",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pacientes"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Buscar paciente por ID",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/pacientes/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pacientes",
-                "1"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Criar paciente",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Carlos Souza\",\n  \"email\": \"carlos.souza@sorrisus.com\",\n  \"senha\": \"senhaSegura123\",\n  \"cpf\": \"12345678901\",\n  \"telefone\": \"83998887777\",\n  \"dataNascimento\": \"1990-05-10\",\n  \"role\": \"ROLE_PACIENTE\"\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/api/pacientes/cadastro",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pacientes",
-                "cadastro"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Atualizar paciente",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Carlos de Souza Lima\",\n  \"email\": \"carlos.lima@sorrisus.com\",\n  \"senha\": \"novaSenha123\",\n  \"cpf\": \"12345678901\",\n  \"telefone\": \"83997776666\",\n  \"dataNascimento\": \"1990-05-10\",\n  \"role\": \"ROLE_PACIENTE\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/pacientes/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pacientes",
-                "1"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Deletar paciente",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/pacientes/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pacientes",
-                "1"
-              ]
-            }
+            "description": "Perfil: qualquer usuário autenticado."
           },
           "response": []
         }
@@ -473,12 +412,7 @@
           "name": "Listar recepcionistas",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/recepcionistas",
               "host": [
@@ -488,7 +422,8 @@
                 "api",
                 "recepcionistas"
               ]
-            }
+            },
+            "description": "Perfil: qualquer usuário autenticado."
           },
           "response": []
         },
@@ -496,28 +431,24 @@
           "name": "Buscar recepcionista por ID",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/api/recepcionistas/1",
+              "raw": "{{base_url}}/api/recepcionistas/{{recepcionistaId}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "recepcionistas",
-                "1"
+                "{{recepcionistaId}}"
               ]
-            }
+            },
+            "description": "Perfil: qualquer usuário autenticado."
           },
           "response": []
         },
         {
-          "name": "Criar recepcionista",
+          "name": "Cadastrar recepcionista",
           "request": {
             "method": "POST",
             "header": [
@@ -526,10 +457,6 @@
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Fernanda Alves\",\n  \"email\": \"fernanda.alves@sorrisus.com\",\n  \"senha\": \"senhaSegura123\",\n  \"turno\": \"TARDE\",\n  \"role\": \"ROLE_RECEPCIONISTA\"\n}"
-            },
             "url": {
               "raw": "{{base_url}}/api/recepcionistas/cadastro",
               "host": [
@@ -540,9 +467,36 @@
                 "recepcionistas",
                 "cadastro"
               ]
+            },
+            "description": "Rota pública (sem token). Atenção: hoje este cadastro é público; a restrição faz parte das correções de segurança pendentes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Fernanda Alves\",\n  \"email\": \"fernanda.alves@sorrisus.com\",\n  \"senha\": \"senhaSegura123\",\n  \"turno\": \"TARDE\",\n  \"role\": \"ROLE_RECEPCIONISTA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
             }
           },
-          "response": []
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.id) pm.collectionVariables.set(\"recepcionistaId\", json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Atualizar recepcionista",
@@ -552,51 +506,340 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Fernanda Lima Alves\",\n  \"email\": \"fernanda.lima@sorrisus.com\",\n  \"senha\": \"novaSenha123\",\n  \"turno\": \"MANHA\",\n  \"role\": \"ROLE_RECEPCIONISTA\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/api/recepcionistas/1",
+              "raw": "{{base_url}}/api/recepcionistas/{{recepcionistaId}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "recepcionistas",
-                "1"
+                "{{recepcionistaId}}"
               ]
+            },
+            "description": "Perfil: qualquer usuário autenticado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Fernanda Lima Alves\",\n  \"email\": \"fernanda.lima@sorrisus.com\",\n  \"senha\": \"novaSenha123\",\n  \"turno\": \"MANHA\",\n  \"role\": \"ROLE_RECEPCIONISTA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
         },
         {
-          "name": "Deletar recepcionista",
+          "name": "Excluir recepcionista",
           "request": {
             "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/api/recepcionistas/1",
+              "raw": "{{base_url}}/api/recepcionistas/{{recepcionistaId}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "recepcionistas",
-                "1"
+                "{{recepcionistaId}}"
               ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🧾 Paciente",
+      "item": [
+        {
+          "name": "Listar pacientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/pacientes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pacientes"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar paciente por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/pacientes/{{pacienteId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pacientes",
+                "{{pacienteId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Cadastrar paciente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pacientes/cadastro",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pacientes",
+                "cadastro"
+              ]
+            },
+            "description": "Perfis: dentista ou recepcionista. O paciente não se autocadastra: o cadastro é feito pela equipe da clínica. O campo \"senha\" é opcional: se não for enviado, a senha inicial é o CPF (somente números), que o paciente deve trocar no primeiro acesso.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carlos Souza\",\n  \"email\": \"carlos.souza@sorrisus.com\",\n  \"senha\": \"senhaSegura123\",\n  \"cpf\": \"12345678901\",\n  \"telefone\": \"83998887777\",\n  \"dataNascimento\": \"1990-05-10\",\n  \"role\": \"ROLE_PACIENTE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.id) pm.collectionVariables.set(\"pacienteId\", json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualizar paciente",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pacientes/{{pacienteId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pacientes",
+                "{{pacienteId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carlos de Souza Lima\",\n  \"email\": \"carlos.lima@sorrisus.com\",\n  \"senha\": \"novaSenha123\",\n  \"cpf\": \"12345678901\",\n  \"telefone\": \"83997776666\",\n  \"dataNascimento\": \"1990-05-10\",\n  \"role\": \"ROLE_PACIENTE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Excluir paciente",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/pacientes/{{pacienteId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pacientes",
+                "{{pacienteId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📦 Serviços",
+      "item": [
+        {
+          "name": "Listar serviços",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/servicos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "servicos"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar serviço por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/servicos/{{servicoId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "servicos",
+                "{{servicoId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Criar serviço",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/servicos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "servicos"
+              ]
+            },
+            "description": "Perfis: dentista ou recepcionista.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"nome\": \"Limpeza Completa (Profilaxia)\",\r\n    \"descricao\": \"Remoção de tártaro e polimento coronário.\",\r\n    \"preco\": 150.00,\r\n    \"ativo\": true\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.id) pm.collectionVariables.set(\"servicoId\", json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualizar serviço",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/servicos/{{servicoId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "servicos",
+                "{{servicoId}}"
+              ]
+            },
+            "description": "Perfis: dentista ou recepcionista.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"nome\": \"Limpeza Completa Premium\",\r\n    \"descricao\": \"Remoção de tártaro, polimento e aplicação de flúor.\",\r\n    \"preco\": 210.00,\r\n    \"ativo\": true\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Desativar serviço",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/servicos/{{servicoId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "servicos",
+                "{{servicoId}}"
+              ]
+            },
+            "description": "Perfis: dentista ou recepcionista. O serviço não é apagado: passa a ficar inativo."
           },
           "response": []
         }
@@ -606,23 +849,15 @@
       "name": "📅 Agendamento",
       "item": [
         {
-          "name": "Agendamentos - Criar",
+          "name": "Criar agendamento",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"dataHora\": \"2025-08-14T10:30:00\",\n  \"pacienteId\": 1,\n  \"dentistaId\": 1,\n  \"servicoId\": 1,\n  \"observacao\": \"Consulta de rotina\"\n}"
-            },
             "url": {
               "raw": "{{base_url}}/api/agendamentos",
               "host": [
@@ -632,101 +867,80 @@
                 "api",
                 "agendamentos"
               ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Agendamentos - Atualizar",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            },
+            "description": "Perfis: dentista ou recepcionista. Cria com status PENDENTE e valida conflito de horário do dentista. Se o paciente tiver telefone, tenta enviar WhatsApp pela Z-API (sem Z-API configurada a resposta pode ser 500, mas o agendamento é salvo).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"dataHora\": \"2025-08-14T11:00:00\",\n  \"pacienteId\": 1,\n  \"dentistaId\": 1,\n  \"servicoId\": 1,\n  \"observacao\": \"Reagendado\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/agendamentos/{{agendamentoId}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "agendamentos",
-                "{{agendamentoId}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Agendamentos - Deletar",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+              "raw": "{\n  \"dataHora\": \"2027-03-10T10:30:00\",\n  \"pacienteId\": {{pacienteId}},\n  \"dentistaId\": {{dentistaId}},\n  \"servicoId\": {{servicoId}},\n  \"observacao\": \"Consulta de rotina\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
               }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/agendamentos/{{agendamentoId}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "agendamentos",
-                "{{agendamentoId}}"
-              ]
             }
           },
-          "response": []
-        },
-        {
-          "name": "Agendamentos - Confirmar",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.id) pm.collectionVariables.set(\"agendamentoId\", json.id);",
+                  "}"
+                ]
               }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/agendamentos/{{agendamentoId}}/confirmar",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "agendamentos",
-                "{{agendamentoId}}",
-                "confirmar"
-              ]
             }
-          },
-          "response": []
+          ]
         },
         {
-          "name": "Agendamentos - Listar por Paciente",
+          "name": "Buscar agendamento por ID",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/agendamentos/{{agendamentoId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agendamentos",
+                "{{agendamentoId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar agendamentos por dentista",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/agendamentos/dentista/{{dentistaId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agendamentos",
+                "dentista",
+                "{{dentistaId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado. Usado na agenda do dentista e na agenda da clínica (recepção)."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar agendamentos por paciente",
+          "request": {
+            "method": "GET",
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/agendamentos/paciente/{{pacienteId}}",
               "host": [
@@ -738,7 +952,104 @@
                 "paciente",
                 "{{pacienteId}}"
               ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar agendamento",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/agendamentos/{{agendamentoId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agendamentos",
+                "{{agendamentoId}}"
+              ]
+            },
+            "description": "Perfis: dentista ou recepcionista. Somente agendamentos PENDENTES podem ser editados.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataHora\": \"2027-03-10T11:00:00\",\n  \"pacienteId\": {{pacienteId}},\n  \"dentistaId\": {{dentistaId}},\n  \"servicoId\": {{servicoId}},\n  \"observacao\": \"Reagendado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirmar agendamento",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/agendamentos/{{agendamentoId}}/confirmar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agendamentos",
+                "{{agendamentoId}}",
+                "confirmar"
+              ]
+            },
+            "description": "Perfis: dentista ou recepcionista. PENDENTE → CONFIRMADO. Gera automaticamente a consulta (status CONFIRMADA)."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar agendamento",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/agendamentos/{{agendamentoId}}/cancelar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agendamentos",
+                "{{agendamentoId}}",
+                "cancelar"
+              ]
+            },
+            "description": "Perfis: dentista ou recepcionista. → CANCELADO, sem excluir o registro. Se já estava confirmado, a consulta gerada também é cancelada (exceto se já REALIZADA ou NAO_COMPARECEU). O horário fica livre."
+          },
+          "response": []
+        },
+        {
+          "name": "Excluir agendamento",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/agendamentos/{{agendamentoId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agendamentos",
+                "{{agendamentoId}}"
+              ]
+            },
+            "description": "Perfis: dentista ou recepcionista. Remove o registro. No fluxo normal use \"Cancelar agendamento\"."
           },
           "response": []
         }
@@ -748,54 +1059,10 @@
       "name": "📋 Consulta",
       "item": [
         {
-          "name": "Consultas - Criar",
+          "name": "Buscar consulta por ID",
           "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"dataHora\": \"2025-08-14T10:30:00\",\n  \"pacienteId\": 3,\n  \"dentistaId\": 2,\n  \"status\": \"PENDENTE\",\n  \"observacao\": \"Consulta criada manualmente\",\n  \"prontuario\": null\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/consultas",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "consultas"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Consultas - Atualizar (inclui prontuário)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"dataHora\": \"2025-08-14T12:00:00\",\n  \"pacienteId\": 1,\n  \"dentistaId\": 1,\n  \"status\": \"CONFIRMADA\",\n  \"observacao\": \"Atualizada após atendimento\",\n  \"prontuario\": {\n    \"observacoes\": \"Paciente apresentou sensibilidade\"\n  }\n}"
-            },
+            "method": "GET",
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/consultas/{{consultaId}}",
               "host": [
@@ -806,20 +1073,250 @@
                 "consultas",
                 "{{consultaId}}"
               ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar consultas por dentista",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/consultas/dentista/{{dentistaId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "consultas",
+                "dentista",
+                "{{dentistaId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar consultas por paciente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/consultas/paciente/{{pacienteId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "consultas",
+                "paciente",
+                "{{pacienteId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Histórico da recepção",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/consultas/historico/recepcao",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "consultas",
+                "historico",
+                "recepcao"
+              ]
+            },
+            "description": "Perfil: somente recepcionista. Lista as consultas de toda a clínica com nomes de paciente e dentista."
+          },
+          "response": []
+        },
+        {
+          "name": "Finalizar atendimento",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/consultas/{{consultaId}}/finalizar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "consultas",
+                "{{consultaId}}",
+                "finalizar"
+              ]
+            },
+            "description": "Perfil: somente dentista. CONFIRMADA → REALIZADA. Só é aceito a partir do horário marcado. Somente consultas REALIZADAS contam para retornos."
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar não comparecimento",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/consultas/{{consultaId}}/nao-compareceu",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "consultas",
+                "{{consultaId}}",
+                "nao-compareceu"
+              ]
+            },
+            "description": "Perfis: dentista ou recepcionista. → NAO_COMPARECEU. Só é aceito depois do horário marcado."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar consulta",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/consultas/{{consultaId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "consultas",
+                "{{consultaId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado. Não exclui: muda o status para CANCELADA e cancela o agendamento de origem."
+          },
+          "response": []
+        },
+        {
+          "name": "Retornos pendentes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/consultas/retornos-pendentes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "consultas",
+                "retornos-pendentes"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado. Pacientes cuja última consulta REALIZADA passou do prazo de retorno e que não têm agendamento futuro pendente."
+          },
+          "response": []
+        },
+        {
+          "name": "Retornos pendentes por dentista",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/consultas/retornos-pendentes/dentista/{{dentistaId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "consultas",
+                "retornos-pendentes",
+                "dentista",
+                "{{dentistaId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Criar consulta manualmente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/consultas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "consultas"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado. No fluxo normal a consulta é criada ao confirmar o agendamento.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataHora\": \"2025-08-14T10:30:00\",\n  \"pacienteId\": 3,\n  \"dentistaId\": 2,\n  \"status\": \"PENDENTE\",\n  \"observacao\": \"Consulta criada manualmente\",\n  \"prontuario\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
         },
         {
-          "name": "Consultas - Alterar Status (PATCH)",
+          "name": "Atualizar consulta",
           "request": {
-            "method": "PATCH",
+            "method": "PUT",
             "header": [
               {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
+            "url": {
+              "raw": "{{base_url}}/api/consultas/{{consultaId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "consultas",
+                "{{consultaId}}"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataHora\": \"2025-08-14T12:00:00\",\n  \"pacienteId\": 1,\n  \"dentistaId\": 1,\n  \"status\": \"CONFIRMADA\",\n  \"observacao\": \"Atualizada após atendimento\",\n  \"prontuario\": {\n    \"observacoes\": \"Paciente apresentou sensibilidade\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Alterar status (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/consultas/{{consultaId}}/status?status=REALIZADA",
               "host": [
@@ -837,56 +1334,8 @@
                   "value": "REALIZADA"
                 }
               ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Consultas - Cancelar (DELETE)",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/consultas/{{consultaId}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "consultas",
-                "{{consultaId}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Consultas - Listar por Paciente",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/consultas/paciente/{{pacienteId}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "consultas",
-                "paciente",
-                "{{pacienteId}}"
-              ]
-            }
+            },
+            "description": "Perfil: qualquer usuário autenticado. Endpoint legado: prefira finalizar/não compareceu/cancelar, que validam as regras. Valores: PENDENTE, CONFIRMADA, REALIZADA, CANCELADA, NAO_COMPARECEU."
           },
           "response": []
         }
@@ -896,23 +1345,15 @@
       "name": "🩺 Prontuário",
       "item": [
         {
-          "name": "Prontuários - Criar (opcional: vincular a consulta)",
+          "name": "Salvar ficha (anamnese + prontuário)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"observacoes\": \"Anotações iniciais do prontuário\"\n}"
-            },
             "url": {
               "raw": "{{base_url}}/api/prontuarios?consultaId={{consultaId}}",
               "host": [
@@ -928,76 +1369,60 @@
                   "value": "{{consultaId}}"
                 }
               ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Prontuários - Buscar por Id",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/prontuarios/{{prontuarioId}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "prontuarios",
-                "{{prontuarioId}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Prontuários - Atualizar",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            },
+            "description": "Perfil: somente dentista. Um único envio: os dados de saúde vão para a Anamnese do paciente e os dados da visita para o Prontuário da consulta. Se já existir, atualiza.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"observacoes\": \"Atualização do prontuário após atendimento\"\n}"
-            },
+              "raw": "{\n  \"alergiaResposta\": \"Sim\",\n  \"alergiaNotas\": \"Dipirona\",\n  \"antibioticoResposta\": \"Não\",\n  \"anestesicoResposta\": \"Não\",\n  \"sensibilidadeResposta\": \"Não\",\n  \"pressaoResposta\": \"Não\",\n  \"medicamentoResposta\": \"Não\",\n  \"problemaSaudeResposta\": \"Não\",\n  \"observacoes\": \"Restauração no dente 16.\",\n  \"planoTratamento\": \"Retorno em 6 meses para profilaxia.\",\n  \"odontogramaJson\": \"{}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.id) pm.collectionVariables.set(\"prontuarioId\", json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar ficha por consulta",
+          "request": {
+            "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/api/prontuarios/{{prontuarioId}}",
+              "raw": "{{base_url}}/api/prontuarios/consulta/{{consultaId}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "prontuarios",
-                "{{prontuarioId}}"
+                "consulta",
+                "{{consultaId}}"
               ]
-            }
+            },
+            "description": "Perfil: qualquer usuário autenticado."
           },
           "response": []
         },
         {
-          "name": "Prontuários - Deletar",
+          "name": "Excluir prontuário",
           "request": {
             "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{base_url}}/api/prontuarios/{{prontuarioId}}",
               "host": [
@@ -1008,187 +1433,47 @@
                 "prontuarios",
                 "{{prontuarioId}}"
               ]
-            }
+            },
+            "description": "Perfil: somente dentista."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "📦 Serviços",
+      "name": "💬 WhatsApp",
       "item": [
         {
-          "name": "Serviços - Deletar Serviço",
+          "name": "Enviar mensagem (teste Z-API)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "http://localhost:8080/api/servicos/1",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "8080",
-              "path": [
-                "api",
-                "servicos",
-                "1"
-              ]
-            },
-            "description": "Generated from cURL: curl --location --request DELETE 'http://localhost:8080/api/servicos/1' \\\r\n--header 'Authorization: Bearer <SEU_TOKEN_JWT_AQUI>'"
-          },
-          "response": []
-        },
-        {
-          "name": "Serviços - Criar Serviço",
-          "request": {
-            "auth": {
-              "type": "bearer"
-            },
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
             ],
+            "url": {
+              "raw": "{{base_url}}/api/whatsapp/send",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "whatsapp",
+                "send"
+              ]
+            },
+            "description": "Perfil: qualquer usuário autenticado. Requer as variáveis da Z-API configuradas no back-end. Use apenas números de teste.",
             "body": {
               "mode": "raw",
-              "raw": "{\r\n    \"nome\": \"Limpeza Completa (Profilaxia)\",\r\n    \"descricao\": \"Remoção de tártaro e polimento coronário.\",\r\n    \"preco\": 150.00,\r\n    \"ativo\": true\r\n}",
+              "raw": "{\n  \"phone\": \"5583900000000\",\n  \"message\": \"Mensagem de teste do Sorrisus\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
-            },
-            "url": {
-              "raw": "http://localhost:8080/api/servicos",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "8080",
-              "path": [
-                "api",
-                "servicos"
-              ]
-            },
-            "description": "Generated from cURL: curl --location 'http://localhost:8080/api/servicos' \\\r\n--header 'Content-Type: application/json' \\\r\n--header 'Authorization: Bearer <SEU_TOKEN_JWT_AQUI>' \\\r\n--data '{\r\n    \"nome\": \"Limpeza Completa (Profilaxia)\",\r\n    \"descricao\": \"Remoção de tártaro e polimento coronário.\",\r\n    \"preco\": 150.00,\r\n    \"ativo\": true\r\n}'"
-          },
-          "response": []
-        },
-        {
-          "name": "Serviços - Atualizar Serviço",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\r\n    \"nome\": \"Limpeza Completa Premium\",\r\n    \"descricao\": \"Remoção de tártaro, polimento e aplicação de flúor.\",\r\n    \"preco\": 210.00,\r\n    \"ativo\": true\r\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "http://localhost:8080/api/servicos/1",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "8080",
-              "path": [
-                "api",
-                "servicos",
-                "1"
-              ]
-            },
-            "description": "Generated from cURL: curl --location --request PUT 'http://localhost:8080/api/servicos/1' \\\r\n--header 'Content-Type: application/json' \\\r\n--header 'Authorization: Bearer <SEU_TOKEN_JWT_AQUI>' \\\r\n--data '{\r\n    \"nome\": \"Limpeza Completa Premium\",\r\n    \"descricao\": \"Remoção de tártaro, polimento e aplicação de flúor.\",\r\n    \"preco\": 200.00,\r\n    \"ativo\": true\r\n}'"
-          },
-          "response": []
-        },
-        {
-          "name": "Serviços - Listar Todos os Serviços",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "http://localhost:8080/api/servicos",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "8080",
-              "path": [
-                "api",
-                "servicos"
-              ]
-            },
-            "description": "Generated from cURL: curl --location 'http://localhost:8080/api/servicos' \\\r\n--header 'Authorization: Bearer <SEU_TOKEN_JWT_AQUI>'"
-          },
-          "response": []
-        },
-        {
-          "name": "Serviços - Buscar Serviço por ID",
-          "request": {
-            "auth": {
-              "type": "bearer"
-            },
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "http://localhost:8080/api/servicos/1",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "8080",
-              "path": [
-                "api",
-                "servicos",
-                "1"
-              ]
-            },
-            "description": "Generated from cURL: curl --location 'http://localhost:8080/api/servicos/1' \\\r\n--header 'Authorization: Bearer <SEU_TOKEN_JWT_AQUI>'"
+            }
           },
           "response": []
         }
@@ -1203,6 +1488,38 @@
     {
       "key": "token",
       "value": ""
+    },
+    {
+      "key": "usuarioId",
+      "value": "1"
+    },
+    {
+      "key": "dentistaId",
+      "value": "1"
+    },
+    {
+      "key": "recepcionistaId",
+      "value": "1"
+    },
+    {
+      "key": "pacienteId",
+      "value": "1"
+    },
+    {
+      "key": "servicoId",
+      "value": "1"
+    },
+    {
+      "key": "agendamentoId",
+      "value": "1"
+    },
+    {
+      "key": "consultaId",
+      "value": "1"
+    },
+    {
+      "key": "prontuarioId",
+      "value": "1"
     }
   ]
 }

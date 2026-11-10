@@ -67,8 +67,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/auth/**",
                             "/api/usuarios/cadastro",
                             "/api/dentistas/cadastro",
-                            "/api/recepcionistas/cadastro",
-                            "/api/pacientes/cadastro"
+                            "/api/recepcionistas/cadastro"
                     ).permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                     .anyRequest().authenticated()

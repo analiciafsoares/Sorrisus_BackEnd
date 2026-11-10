@@ -1,5 +1,6 @@
 package com.ifpb.sorrisus.service;
 
+import com.ifpb.sorrisus.exception.BusinessException;
 import com.ifpb.sorrisus.exception.EmailAlreadyExistsException;
 import com.ifpb.sorrisus.exception.InvalidFieldException;
 import com.ifpb.sorrisus.exception.ResourceNotFoundException;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Arrays;
 import java.util.List;
@@ -27,6 +29,9 @@ class UsuarioServiceTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private UsuarioService usuarioService;
@@ -242,5 +247,46 @@ class UsuarioServiceTest {
                 .hasMessageContaining("Usuário com id 99 não encontrado");
 
         verify(usuarioRepository, never()).delete(any(Usuario.class));
+    }
+
+    @Test
+    @DisplayName("Deve alterar a senha quando a senha atual confere")
+    void deveAlterarSenha() {
+        usuarioBase.setSenha("hash-atual");
+        when(usuarioRepository.findByEmail("maria@sorrisus.com")).thenReturn(Optional.of(usuarioBase));
+        when(passwordEncoder.matches("senhaAtual", "hash-atual")).thenReturn(true);
+        when(passwordEncoder.matches("novaSenha123", "hash-atual")).thenReturn(false);
+        when(passwordEncoder.encode("novaSenha123")).thenReturn("hash-novo");
+
+        usuarioService.alterarSenha("maria@sorrisus.com", "senhaAtual", "novaSenha123");
+
+        assertThat(usuarioBase.getSenha()).isEqualTo("hash-novo");
+        verify(usuarioRepository).save(usuarioBase);
+    }
+
+    @Test
+    @DisplayName("Não deve alterar a senha quando a senha atual está incorreta")
+    void naoDeveAlterarSenhaComSenhaAtualIncorreta() {
+        usuarioBase.setSenha("hash-atual");
+        when(usuarioRepository.findByEmail("maria@sorrisus.com")).thenReturn(Optional.of(usuarioBase));
+        when(passwordEncoder.matches("errada", "hash-atual")).thenReturn(false);
+
+        assertThatThrownBy(() -> usuarioService.alterarSenha("maria@sorrisus.com", "errada", "novaSenha123"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("A senha atual está incorreta.");
+        verify(usuarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Não deve aceitar nova senha igual à atual")
+    void naoDeveAceitarNovaSenhaIgualAtual() {
+        usuarioBase.setSenha("hash-atual");
+        when(usuarioRepository.findByEmail("maria@sorrisus.com")).thenReturn(Optional.of(usuarioBase));
+        when(passwordEncoder.matches("mesmaSenha", "hash-atual")).thenReturn(true);
+
+        assertThatThrownBy(() -> usuarioService.alterarSenha("maria@sorrisus.com", "mesmaSenha", "mesmaSenha"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("A nova senha deve ser diferente da senha atual.");
+        verify(usuarioRepository, never()).save(any());
     }
 }

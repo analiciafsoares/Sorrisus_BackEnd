@@ -1,10 +1,12 @@
 package com.ifpb.sorrisus.service;
 
+import com.ifpb.sorrisus.exception.BusinessException;
 import com.ifpb.sorrisus.exception.EmailAlreadyExistsException;
 import com.ifpb.sorrisus.exception.ResourceNotFoundException;
 import com.ifpb.sorrisus.exception.InvalidFieldException;
 import com.ifpb.sorrisus.model.Usuario;
 import com.ifpb.sorrisus.repository.UsuarioRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,9 +15,11 @@ import java.util.List;
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UsuarioService(UsuarioRepository usuarioRepository) {
+    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
         this.usuarioRepository = usuarioRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public Usuario salvar(Usuario usuario) {
@@ -64,6 +68,20 @@ public class UsuarioService {
         existente.setRole(usuarioAtualizado.getRole());
 
         return usuarioRepository.save(existente);
+    }
+
+    public void alterarSenha(String email, String senhaAtual, String novaSenha) {
+        Usuario usuario = buscarPorEmail(email);
+
+        if (!passwordEncoder.matches(senhaAtual, usuario.getSenha())) {
+            throw new BusinessException("A senha atual está incorreta.");
+        }
+        if (passwordEncoder.matches(novaSenha, usuario.getSenha())) {
+            throw new BusinessException("A nova senha deve ser diferente da senha atual.");
+        }
+
+        usuario.setSenha(passwordEncoder.encode(novaSenha));
+        usuarioRepository.save(usuario);
     }
 
     public void deletar(Long id) {

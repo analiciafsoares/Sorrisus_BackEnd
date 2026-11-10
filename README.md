@@ -2,16 +2,18 @@
 
 ## Sobre o projeto
 
-O **Sorrisus** é um sistema odontológico desenvolvido como parte de um projeto acadêmico, com o objetivo de auxiliar na gestão de clínicas odontológicas. Ele permite o gerenciamento de informações relacionadas a **usuários**, **pacientes**, **dentistas** e **recepcionistas**, centralizando os dados em um único sistema.
+O **Sorrisus** é um sistema odontológico desenvolvido como projeto acadêmico no IFPB, com o objetivo de auxiliar na gestão de clínicas odontológicas. Ele centraliza o cadastro de **pacientes**, **dentistas** e **recepcionistas**, a **agenda**, as **consultas**, a **ficha clínica** (anamnese, prontuário e odontograma), o catálogo de **serviços** e o acompanhamento de **retornos pendentes**.
+
+Este repositório contém a **API REST (back-end)**. A interface fica no repositório `Sorrisus_FrontEnd`.
 
 O sistema está sendo desenvolvido em **Java com Spring Boot**, utilizando **MySQL** como banco de dados relacional, e segue uma **arquitetura em camadas** (Controller → Service → Repository → Model).
 
 Com a evolução do projeto, o backend agora possui **autenticação completa com JWT**, **rotas protegidas**, **controle de acesso por papéis (roles)** e **middleware de segurança** usando Spring Security.
 
 
-## 🛡️ Autenticação JWT (nova funcionalidade)
+## 🛡️ Autenticação JWT
 
-O sistema agora implementa um fluxo completo de autenticação baseado em JWT (**JSON Web Token**).
+O sistema implementa um fluxo completo de autenticação baseado em JWT (**JSON Web Token**).
 
 ### Como funciona?
 
@@ -21,20 +23,49 @@ O sistema agora implementa um fluxo completo de autenticação baseado em JWT (*
 4. O token precisa ser enviado em todas as requisições protegidas no header:
 
 ```
-
-Authorization: Bearer \<token\>
-
+Authorization: Bearer <token>
 ```
+
+O token expira após o tempo definido em `JWT_EXPIRATION_MS`. A resposta do login traz `accessToken`, `userId`, `email` e `role`.
 
 ### Rotas públicas (sem autenticação)
 
 - `POST /api/auth/login`
 - `POST /api/usuarios/cadastro`
 - `POST /api/dentistas/cadastro`
-- `POST /api/pacientes/cadastro`
 - `POST /api/recepcionistas/cadastro`
 
-Todas as demais rotas agora **exigem autenticação**.
+Todas as demais rotas **exigem autenticação**.
+
+> **O paciente não se autocadastra.** O cadastro de pacientes (`POST /api/pacientes/cadastro`) exige login de dentista ou recepcionista. A equipe não precisa definir a senha: quando o campo `senha` não é enviado, a **senha inicial é o CPF do paciente (somente números)**. O paciente deve trocá-la no primeiro acesso.
+
+### Alterar a própria senha
+
+Qualquer usuário autenticado pode trocar a sua senha:
+
+* **Endpoint:** `PUT /api/usuarios/me/senha`
+* **Corpo:** `{ "senhaAtual": "...", "novaSenha": "..." }`
+* **Regras:** o usuário é identificado pelo token (ninguém altera a senha de outra pessoa); a senha atual precisa conferir; a nova senha deve ter pelo menos 6 caracteres e ser diferente da atual. Responde **204** em caso de sucesso.
+>
+> As rotas de cadastro de usuários, dentistas e recepcionistas ainda são públicas. Pelas regras do sistema, o cadastro de profissionais deve ser feito apenas por um dentista; essa restrição está pendente.
+
+### Permissões por perfil
+
+Além de exigir login, alguns endpoints são restritos por perfil (`@PreAuthorize`). Quando o perfil não tem permissão, a API responde **403**.
+
+| Ação | Perfis permitidos |
+| :--- | :--- |
+| Criar, editar, confirmar, cancelar e excluir agendamentos | Dentista, Recepcionista |
+| Cadastrar pacientes | Dentista, Recepcionista |
+| Criar, editar e desativar serviços | Dentista, Recepcionista |
+| Registrar não comparecimento | Dentista, Recepcionista |
+| Finalizar atendimento | Dentista |
+| Salvar e excluir ficha clínica (prontuário/anamnese) | Dentista |
+| Histórico de consultas da clínica (`/consultas/historico/recepcao`) | Recepcionista |
+| Alterar a própria senha (`/usuarios/me/senha`) | Qualquer usuário autenticado |
+| Demais consultas (listagens, buscas por ID, retornos pendentes) | Qualquer usuário autenticado |
+
+Os perfis existentes são `ROLE_DENTISTA`, `ROLE_RECEPCIONISTA` e `ROLE_PACIENTE`. O paciente não cria nem altera agendamentos: ele apenas consulta os próprios dados.
 
 ### Middleware de segurança
 
@@ -49,24 +80,18 @@ O CORS foi configurado globalmente para permitir que o front-end (porta 5173, Vi
 
 Origem permitida:
 ```
-
 http://localhost:5173
-
 ```
 
 Métodos liberados:
 ```
-
 GET, POST, PUT, DELETE, OPTIONS
-
 ```
 
 Headers permitidos:
 ```
-
 Authorization, Content-Type
-
-````
+```
 
 Credenciais habilitadas (para envio de token).
 
@@ -75,20 +100,22 @@ Credenciais habilitadas (para envio de token).
 Atualmente, o backend do sistema conta com:
 
 * **Entidades modeladas:**
-  * `Usuario`
-  * `Paciente`
-  * `Dentista`
-  * `Recepcionista`
+  * `Usuario` (base) → `Paciente`, `Dentista`, `Recepcionista`
   * `Role` (enum de papéis de usuário)
-  * `Agendamento` / `Consulta`
+  * `Agendamento` (status `PENDENTE`, `CONFIRMADO`, `CANCELADO`)
+  * `Consulta` (status `PENDENTE`, `CONFIRMADA`, `REALIZADA`, `CANCELADA`, `NAO_COMPARECEU`)
   * `Prontuario` / `Anamnese`
+  * `Servico`
 
-* **CRUD completo** (Create, Read, Update, Delete) para todas as entidades.
-* **Autenticação JWT** com filtro, validação e roles.
-* **Rotas protegidas por segurança** via Spring Security.
-* **Tratamento global de exceções**.
-* **Banco MySQL configurado** com criação automática via JPA/Hibernate.
-* **Uso de variáveis de ambiente** para dados sensíveis.
+* **CRUD** de usuários, pacientes, dentistas, recepcionistas e serviços (a exclusão de serviço apenas o desativa).
+* **Agenda** com validação de conflito de horário por dentista e fluxo de status (confirmar, cancelar, finalizar, não comparecimento), sem exclusão de histórico.
+* **Ficha clínica** (anamnese + prontuário + odontograma) salva em uma única requisição.
+* **Retornos pendentes:** pacientes cuja última consulta realizada tem mais de 6 meses e que não possuem agendamento futuro pendente.
+* **Mensagens por WhatsApp (Z-API):** aviso ao paciente quando um agendamento é criado e lembrete de retorno, executado na inicialização e diariamente (agendamento configurável).
+* **Autenticação JWT** com filtro, validação e controle de acesso por perfil.
+* **Tratamento global de exceções** (404, 400, 401, 403 e erros de validação com mensagens em português).
+* **Banco MySQL** com criação automática das tabelas via JPA/Hibernate (`ddl-auto=update`).
+* **Variáveis de ambiente** para dados sensíveis.
 * **Projeto configurado com Lombok** e **Spring DevTools**.
 
 ## Fluxo de Agendamento, Consulta e Prontuário
@@ -154,9 +181,16 @@ Consulta (criada na confirmação): CONFIRMADA ──finalizar──────
 | **Agendamento** | Cancelar | `POST .../{id}/cancelar` | Cancela sem excluir (e cancela a consulta gerada). |
 | **Consulta** | Finalizar | `POST /api/consultas/{id}/finalizar` | Marca como realizada (dentista). |
 | **Consulta** | Não compareceu | `POST /api/consultas/{id}/nao-compareceu` | Registra a falta do paciente. |
-| **Consulta** | Listar | `GET /api/consultas/paciente/{id}` | Histórico de atendimentos. |
-| **Prontuário** | Salvar Ficha | `POST /api/prontuarios` | Salva Anamnese e Prontuário juntos. |
+| **Consulta** | Listar | `GET /api/consultas/paciente/{id}` | Histórico de atendimentos do paciente. |
+| **Consulta** | Listar | `GET /api/consultas/dentista/{id}` | Consultas do dentista. |
+| **Consulta** | Histórico | `GET /api/consultas/historico/recepcao` | Consultas de toda a clínica (recepção). |
+| **Consulta** | Retornos | `GET /api/consultas/retornos-pendentes` | Pacientes com retorno pendente (também por dentista: `.../dentista/{id}`). |
+| **Prontuário** | Salvar Ficha | `POST /api/prontuarios?consultaId={id}` | Salva Anamnese e Prontuário juntos. |
 | **Prontuário** | Buscar | `GET .../consulta/{id}` | Recupera ficha completa da visita. |
+| **Agendamento** | Agenda | `GET /api/agendamentos/dentista/{id}` | Agenda de um dentista (usada também pela recepção). |
+| **Serviço** | CRUD | `/api/servicos` | Catálogo de serviços (`DELETE` desativa). |
+
+A lista completa, com exemplos de requisição, está na collection do Postman (seção **Testes**).
 
 ## Tecnologias utilizadas
 
@@ -191,15 +225,23 @@ ALTER TABLE agendamentos MODIFY status VARCHAR(20) NULL;
 
 ### 2\. Configurar variáveis de ambiente
 
-Agora o sistema utiliza **4 variáveis principais**:
+O sistema lê as seguintes variáveis de ambiente:
 
-```
-DB_URL=
-DB_USER=
-DB_PASS=
-JWT_SECRET=
-JWT_EXPIRATION_MS=
-```
+| Variável | Obrigatória | Descrição |
+| :--- | :--- | :--- |
+| `DB_URL` | Sim | URL JDBC do MySQL |
+| `DB_USER` | Sim | Usuário do banco |
+| `DB_PASS` | Sim | Senha do banco |
+| `JWT_SECRET` | Sim | Chave secreta para assinar os tokens |
+| `JWT_EXPIRATION_MS` | Sim | Validade do token em milissegundos (ex.: `3600000` = 1 hora) |
+| `ZAPI_INSTANCE` | Sim* | Instância da Z-API (WhatsApp) |
+| `ZAPI_TOKEN` | Sim* | Token da instância Z-API |
+| `ZAPI_CLIENT_TOKEN` | Sim* | Client token da conta Z-API |
+| `RETORNO_LEMBRETE_ENABLED` | Sim | `true` para enviar lembretes de retorno; `false` para desativar |
+| `RETORNO_LEMBRETE_CRON` | Sim | Agendamento do lembrete (ex.: `0 0 9 * * *` = todo dia às 9h) |
+| `RETORNO_LEMBRETE_ZONE` | Sim | Fuso horário do agendamento (ex.: `America/Fortaleza`) |
+
+\* As variáveis da Z-API precisam existir para a aplicação iniciar, mas podem ficar vazias em desenvolvimento. Sem Z-API configurada, o envio de mensagens falha: a criação de agendamento salva o registro, mas pode responder com erro 500. Nunca versione valores reais dessas variáveis.
 
 ### Exemplos
 
@@ -211,17 +253,39 @@ set DB_USER=seu_usuario
 set DB_PASS=sua_senha
 set JWT_SECRET=sua_chave_secreta_muito_segura
 set JWT_EXPIRATION_MS=3600000
+set ZAPI_INSTANCE=
+set ZAPI_TOKEN=
+set ZAPI_CLIENT_TOKEN=
+set RETORNO_LEMBRETE_ENABLED=false
+set RETORNO_LEMBRETE_CRON=0 0 9 * * *
+set RETORNO_LEMBRETE_ZONE=America/Fortaleza
 ```
 
 #### **Linux/Mac (bash)**
 
 ```bash
-export DB_URL=jdbc:mysql://localhost:3306/sorrisus_db?useSSL=false&serverTimezone=UTC
+export DB_URL="jdbc:mysql://localhost:3306/sorrisus_db?useSSL=false&serverTimezone=UTC"
 export DB_USER=seu_usuario
 export DB_PASS=sua_senha
 export JWT_SECRET=sua_chave_secreta_muito_segura
 export JWT_EXPIRATION_MS=3600000
+export ZAPI_INSTANCE=
+export ZAPI_TOKEN=
+export ZAPI_CLIENT_TOKEN=
+export RETORNO_LEMBRETE_ENABLED=false
+export RETORNO_LEMBRETE_CRON="0 0 9 * * *"
+export RETORNO_LEMBRETE_ZONE=America/Fortaleza
 ```
+
+> No bash, coloque `DB_URL` entre aspas se ela contiver `&`.
+
+### 3. Executar
+
+```bash
+./mvnw spring-boot:run
+```
+
+A API fica disponível em `http://localhost:8080/api`.
 
 ## Como subir via Docker
 
@@ -235,7 +299,16 @@ DB_URL=jdbc:mysql://db_sorrisus:3306/sorrisus_db?useSSL=false&serverTimezone=UTC
 
 JWT_SECRET=sua_chave_super_secreta
 JWT_EXPIRATION_MS=3600000
+
+ZAPI_INSTANCE=
+ZAPI_TOKEN=
+ZAPI_CLIENT_TOKEN=
+
+# Opcionais no Docker (valores padrão: true, "0 0 9 * * *", America/Fortaleza)
+RETORNO_LEMBRETE_ENABLED=false
 ```
+
+O arquivo `.env` contém segredos e não deve ser versionado.
 
 -----
 
@@ -282,13 +355,15 @@ docker compose down -v
 
 ## Estrutura do projeto
 
-  * `model/` → entidades JPA
+  * `model/` → entidades JPA e enums de status
+  * `dto/` → objetos de entrada e saída da API
   * `repository/` → persistência
-  * `service/` → regras de negócio
+  * `service/` → regras de negócio (inclui o agendador de lembretes de retorno)
   * `controller/` → endpoints REST
   * `security/` → autenticação e JWT
   * `config/` → configs globais (CORS, Security)
-  * `resources/application.yml` → configurações
+  * `exception/` → exceções de negócio e tratamento global de erros
+  * `resources/application.properties` → configurações
 
 ## Testes
 
@@ -298,76 +373,81 @@ O sistema pode ser testado via **Postman**, utilizando a collection disponível 
 collection/Sorrisus_API_Collection.json
 ```
 
-Cada entidade possui operações:
+Como usar:
 
-  * Criar (`POST`)
-  * Listar (`GET`)
-  * Buscar por ID (`GET`)
-  * Atualizar (`PUT`)
-  * Deletar (`DELETE`)
+1. Importe o arquivo no Postman (**Import**).
+2. Confira a variável `base_url` da collection (padrão `http://localhost:8080`).
+3. Execute **🔐 Auth → Login** com o e-mail e a senha de um usuário do perfil desejado. O token é salvo automaticamente na variável `token` e enviado em todas as requisições.
+4. As requisições de criação salvam o ID gerado (`pacienteId`, `agendamentoId`, `consultaId`...). Para usar registros já existentes, edite essas variáveis.
+
+A descrição de cada requisição indica o perfil exigido. Fluxo sugerido para testar a agenda: criar agendamento → confirmar → listar consultas do dentista (para obter o `consultaId`) → salvar ficha → finalizar atendimento.
 
 ## Testes unitários
 
 Os testes podem ser executados com:
 
 ```
-mvn test
+./mvnw test
 ```
 
-Incluem testes de serviços e agora também testes de autenticação JWT.
+Incluem testes das regras de negócio dos serviços (agendamentos, consultas, serviços, retornos e lembretes) e testes de autenticação JWT. O teste `contextLoads` sobe a aplicação completa e, por isso, precisa de um MySQL acessível e das variáveis de ambiente configuradas.
 
 ## Próximos passos
 
-  * Criar relacionamento entre entidades (ex: Paciente ↔ Dentista)
-  * Criar dashboard no front-end
-  * Implementar auditoria de ações
+  * Restringir o cadastro de profissionais ao perfil de dentista
+  * Emissão de receituário
+  * Relatórios gerenciais
+  * Recuperação de senha
+  * Exigir a troca da senha inicial no primeiro acesso (ou envio de link para definição de senha)
+  * Bloqueio de login após tentativas inválidas
+  * Lembrete de consulta 24 horas antes
 
 ## 👥 Contribuidores
 
-\<table\>
-\<tr\>
-\<td align="center"\>
-\<a href="https://github.com/estertrvs" title="GitHub"\>
-\<img src="https://avatars.githubusercontent.com/u/141650957?v=4" width="100px;" alt="Foto de Ester"/\><br>
-\<sub\>
-\<b\>Ester Trevisan\</b\>
-\</sub\>
-\</a\>
-\</td\>
-\<td align="center"\>
-\<a href="https://github.com/analiciafsoares" title="GitHub"\>
-\<img src="https://avatars.githubusercontent.com/u/144076062?v=4" width="100px;" alt="Foto de Ana"/\><br>
-\<sub\>
-\<b\>Ana Licia Soares\</b\>
-\</sub\>
-\</a\>
-\</td\>
-\<td align="center"\>
-\<a href="https://github.com/Joaopaulomedeirosdesouza" title="GitHub"\>
-\<img src="https://avatars.githubusercontent.com/u/148402008?v=4" width="100px;" alt="Foto de João Paulo"/\><br>
-\<sub\>
-\<b\>João Paulo Medeiros\</b\>
-\</sub\>
-\</a\>
-\</td\>
-\<td align="center"\>
-\<a href="https://github.com/KesleyWilie" title="GitHub"\>
-\<img src="https://avatars.githubusercontent.com/u/144160126?v=4" width="100px;" alt="Foto de Kesley"/\><br>
-\<sub\>
-\<b\>Kesley Wilie\</b\>
-\</sub\>
-\</a\>
-\</td\>
-\<td align="center"\>
-\<a href="https://github.com/GeorgeAdOliveira" title="GitHub"\>
-\<img src="https://avatars.githubusercontent.com/u/143577407?v=4" width="100px;" alt="Foto de George"/\><br>
-\<sub\>
-\<b\>George Oliveira\</b\>
-\</sub\>
-\</a\>
-\</td\>
-\</tr\>
-\</table\>
+<table>
+<tr>
+<td align="center">
+<a href="https://github.com/estertrvs" title="GitHub">
+<img src="https://avatars.githubusercontent.com/u/141650957?v=4" width="100px;" alt="Foto de Ester"/><br>
+<sub>
+<b>Ester Trevisan</b>
+</sub>
+</a>
+</td>
+<td align="center">
+<a href="https://github.com/analiciafsoares" title="GitHub">
+<img src="https://avatars.githubusercontent.com/u/144076062?v=4" width="100px;" alt="Foto de Ana"/><br>
+<sub>
+<b>Ana Licia Soares</b>
+</sub>
+</a>
+</td>
+<td align="center">
+<a href="https://github.com/Joaopaulomedeirosdesouza" title="GitHub">
+<img src="https://avatars.githubusercontent.com/u/148402008?v=4" width="100px;" alt="Foto de João Paulo"/><br>
+<sub>
+<b>João Paulo Medeiros</b>
+</sub>
+</a>
+</td>
+<td align="center">
+<a href="https://github.com/KesleyWilie" title="GitHub">
+<img src="https://avatars.githubusercontent.com/u/144160126?v=4" width="100px;" alt="Foto de Kesley"/><br>
+<sub>
+<b>Kesley Wilie</b>
+</sub>
+</a>
+</td>
+<td align="center">
+<a href="https://github.com/GeorgeAdOliveira" title="GitHub">
+<img src="https://avatars.githubusercontent.com/u/143577407?v=4" width="100px;" alt="Foto de George"/><br>
+<sub>
+<b>George Oliveira</b>
+</sub>
+</a>
+</td>
+</tr>
+</table>
 
 ---
-**Instituto Federal da Paraíba** — Disciplina de **Projeto II**.
+**Instituto Federal da Paraíba (IFPB) — Campus Monteiro.** Projeto iniciado nas disciplinas de **Projeto I** e **Projeto II** e continuado como **Trabalho de Conclusão de Curso**.
