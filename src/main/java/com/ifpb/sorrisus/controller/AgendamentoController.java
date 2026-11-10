@@ -37,6 +37,7 @@ public class AgendamentoController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
     public ResponseEntity<AgendamentoDTO> criar(@Valid @RequestBody AgendamentoDTO dto) {
         Agendamento ag = new Agendamento();
         ag.setDataHora(dto.getDataHora());
@@ -70,6 +71,7 @@ public class AgendamentoController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
     public ResponseEntity<AgendamentoDTO> atualizar(@PathVariable Long id, @Valid @RequestBody AgendamentoDTO dto) {
         Agendamento ag = new Agendamento();
         ag.setDataHora(dto.getDataHora());
@@ -87,12 +89,14 @@ public class AgendamentoController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/confirmar")
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
     public ResponseEntity<AgendamentoDTO> confirmar(@PathVariable Long id) {
         Agendamento confirmado = service.confirmar(id);
         return ResponseEntity.ok(toDTO(confirmado));
