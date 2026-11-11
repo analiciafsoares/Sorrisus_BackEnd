@@ -2,11 +2,14 @@ package com.ifpb.sorrisus.controller;
 
 import com.ifpb.sorrisus.dto.AgendamentoDTO;
 import com.ifpb.sorrisus.exception.ResourceNotFoundException;
+import com.ifpb.sorrisus.exception.WhatsAppSendException;
 import com.ifpb.sorrisus.model.*;
 import com.ifpb.sorrisus.service.AgendamentoService;
 import com.ifpb.sorrisus.repository.DentistaRepository;
 import com.ifpb.sorrisus.repository.PacienteRepository;
 import com.ifpb.sorrisus.service.WhatsAppService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +23,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/agendamentos")
 public class AgendamentoController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AgendamentoController.class);
 
     private final AgendamentoService service;
     private final PacienteRepository pacienteRepository;
@@ -54,17 +59,27 @@ public class AgendamentoController {
 
         AgendamentoDTO resp = toDTO(salvo);
 
-        // Envio de Agendamento para o paciente
-        if (paciente.getTelefone() != null) {
-            String mensagem = "Olá " + paciente.getNome() + ",\n\n"
-                    + "Seu agendamento foi realizado com sucesso.\n"
-                    + "🗓 Data e Horário: " + ag.getDataHora().format(DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm")) + "\n"
-                    + "📍 Local: Rua Francisco de Melo, 304, centro. Sumé-PB " + "\n\n"
-                    + "Por favor, chegue com 10 minutos de antecedência e traga seus documentos pessoais.\n\n"
-                    + "Atenciosamente,\n"
-                    + "Equipe Sorrisus";
+        // A notificação é um efeito secundário: sua falha não invalida o agendamento já criado.
+        if (paciente.getTelefone() != null && !paciente.getTelefone().isBlank()) {
+            try {
+                String mensagem = "Olá " + paciente.getNome() + ",\n\n"
+                        + "Seu agendamento foi realizado com sucesso.\n"
+                        + "🗓 Data e Horário: " + salvo.getDataHora().format(DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm")) + "\n"
+                        + "📍 Local: Rua Francisco de Melo, 304, centro. Sumé-PB " + "\n\n"
+                        + "Por favor, chegue com 10 minutos de antecedência e traga seus documentos pessoais.\n\n"
+                        + "Atenciosamente,\n"
+                        + "Equipe Sorrisus";
 
-            whatsAppService.sendMessage(paciente.getTelefone(), mensagem);
+                whatsAppService.sendMessage(paciente.getTelefone(), mensagem);
+            } catch (WhatsAppSendException e) {
+                logger.warn(
+                        "Agendamento id={} criado, mas a notificação via WhatsApp falhou (tipo={}, statusHttp={}): {}",
+                        salvo.getId(), e.getTipoFalha(), e.getStatusHttp(), e.getMessage());
+            } catch (RuntimeException e) {
+                logger.error(
+                        "Agendamento id={} criado, mas ocorreu uma falha inesperada ao enviar a notificação via WhatsApp.",
+                        salvo.getId(), e);
+            }
         }
 
         return ResponseEntity.created(URI.create("/api/agendamentos/" + salvo.getId())).body(resp);
