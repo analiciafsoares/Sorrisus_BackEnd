@@ -66,6 +66,27 @@ class ProntuarioServiceTest {
     }
 
     @Test
+    @DisplayName("Deve criar prontuário e vinculá-lo à consulta correta")
+    void deveCriarProntuarioParaConsulta() {
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+        when(anamneseService.salvarOuAtualizar(paciente, dto)).thenReturn(anamneseMock);
+        when(prontuarioRepository.save(any())).thenAnswer(inv -> {
+            Prontuario prontuario = inv.getArgument(0);
+            prontuario.setId(77L);
+            return prontuario;
+        });
+
+        ProntuarioDTO resultado = service.salvarFichaClinica(dto, 10L);
+
+        assertEquals(77L, resultado.getId());
+        assertNotNull(consulta.getProntuario());
+        assertSame(consulta, consulta.getProntuario().getConsulta());
+        assertEquals("Paciente com dor", consulta.getProntuario().getObservacoes());
+        assertEquals("{dente:16}", consulta.getProntuario().getOdontogramaJson());
+        verify(consultaRepository).save(consulta);
+    }
+
+    @Test
     @DisplayName("Deve salvar prontuário em consulta que já possui prontuário (Atualização)")
     void deveAtualizarProntuarioExistente() {
         Prontuario pExistente = new Prontuario();
@@ -83,6 +104,24 @@ class ProntuarioServiceTest {
     }
 
     @Test
+    @DisplayName("Deve criar ou atualizar a anamnese ao salvar um prontuário legado sem anamnese")
+    void deveSalvarAnamneseParaProntuarioLegado() {
+        Prontuario prontuarioLegado = new Prontuario();
+        prontuarioLegado.setId(56L);
+        prontuarioLegado.setConsulta(consulta);
+        consulta.setProntuario(prontuarioLegado);
+
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+        when(anamneseService.salvarOuAtualizar(paciente, dto)).thenReturn(anamneseMock);
+        when(prontuarioRepository.save(prontuarioLegado)).thenReturn(prontuarioLegado);
+
+        service.salvarFichaClinica(dto, 10L);
+
+        verify(anamneseService).salvarOuAtualizar(paciente, dto);
+        verify(prontuarioRepository).save(prontuarioLegado);
+    }
+
+    @Test
     @DisplayName("Deve buscar ficha e retornar anamnese vazia se não existir")
     void deveBuscarComAnamneseVazia() {
         Prontuario p = new Prontuario();
@@ -96,6 +135,48 @@ class ProntuarioServiceTest {
         
         assertNotNull(resultado);
         assertNull(resultado.getAlergiaResposta());
+    }
+
+    @Test
+    @DisplayName("Deve retornar não encontrado quando a consulta ainda não possui prontuário")
+    void deveFalharBuscaSemProntuario() {
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+
+        ResourceNotFoundException erro = assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.buscarPorConsultaId(10L));
+
+        assertEquals("Nenhum prontuário registrado para esta consulta.", erro.getMessage());
+        verify(anamneseService, never()).buscarPorPaciente(any());
+    }
+
+    @Test
+    @DisplayName("Deve manter prontuários separados para consultas diferentes do mesmo paciente")
+    void deveManterProntuariosSeparadosPorConsulta() {
+        Consulta segundaConsulta = new Consulta();
+        segundaConsulta.setId(20L);
+        segundaConsulta.setPaciente(paciente);
+
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+        when(consultaRepository.findById(20L)).thenReturn(Optional.of(segundaConsulta));
+        when(anamneseService.salvarOuAtualizar(eq(paciente), any())).thenReturn(anamneseMock);
+        when(prontuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ProntuarioDTO primeiraFicha = new ProntuarioDTO();
+        primeiraFicha.setObservacoes("Consulta 1");
+        primeiraFicha.setOdontogramaJson("{\"11\":\"treated\"}");
+        ProntuarioDTO segundaFicha = new ProntuarioDTO();
+        segundaFicha.setObservacoes("Consulta 2");
+        segundaFicha.setOdontogramaJson("{\"11\":\"decayed\"}");
+
+        service.salvarFichaClinica(primeiraFicha, 10L);
+        service.salvarFichaClinica(segundaFicha, 20L);
+
+        assertNotSame(consulta.getProntuario(), segundaConsulta.getProntuario());
+        assertSame(consulta, consulta.getProntuario().getConsulta());
+        assertSame(segundaConsulta, segundaConsulta.getProntuario().getConsulta());
+        assertEquals("{\"11\":\"treated\"}", consulta.getProntuario().getOdontogramaJson());
+        assertEquals("{\"11\":\"decayed\"}", segundaConsulta.getProntuario().getOdontogramaJson());
     }
 
     @Test

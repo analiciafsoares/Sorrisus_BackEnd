@@ -1,9 +1,11 @@
 package com.ifpb.sorrisus.service;
 
 import com.ifpb.sorrisus.dto.ProntuarioDTO;
+import com.ifpb.sorrisus.exception.ResourceNotFoundException;
 import com.ifpb.sorrisus.model.Anamnese;
 import com.ifpb.sorrisus.model.Paciente;
 import com.ifpb.sorrisus.repository.AnamneseRepository;
+import com.ifpb.sorrisus.repository.PacienteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,14 +13,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class AnamneseService {
 
     private final AnamneseRepository anamneseRepository;
+    private final PacienteRepository pacienteRepository;
 
-    public AnamneseService(AnamneseRepository anamneseRepository) {
+    public AnamneseService(AnamneseRepository anamneseRepository,
+                           PacienteRepository pacienteRepository) {
         this.anamneseRepository = anamneseRepository;
+        this.pacienteRepository = pacienteRepository;
     }
 
     public Anamnese buscarPorPaciente(Paciente paciente) {
         return anamneseRepository.findByPaciente(paciente)
                 .orElse(new Anamnese());
+    }
+
+    public Anamnese buscarExistentePorPacienteId(Long pacienteId) {
+        Paciente paciente = pacienteRepository.findById(pacienteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Paciente não encontrado."));
+
+        return anamneseRepository.findByPaciente(paciente)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Anamnese não encontrada para este paciente."));
     }
 
     @Transactional
