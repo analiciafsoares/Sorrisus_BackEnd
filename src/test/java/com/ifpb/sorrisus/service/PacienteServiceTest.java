@@ -1,6 +1,7 @@
 package com.ifpb.sorrisus.service;
 
 import com.ifpb.sorrisus.exception.CPFAlreadyExistsException;
+import com.ifpb.sorrisus.exception.EmailAlreadyExistsException;
 import com.ifpb.sorrisus.exception.InvalidCPFException;
 import com.ifpb.sorrisus.exception.InvalidFieldException;
 import com.ifpb.sorrisus.exception.ResourceNotFoundException;
@@ -9,9 +10,11 @@ import com.ifpb.sorrisus.repository.PacienteRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -26,10 +29,11 @@ import static org.mockito.Mockito.*;
 @DisplayName("Teste Unitário - PacienteService")
 class PacienteServiceTest {
 
+    private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
+
     @Mock
     private PacienteRepository pacienteRepository;
 
-    @InjectMocks
     private PacienteService pacienteService;
 
     private Paciente paciente;
@@ -37,26 +41,27 @@ class PacienteServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        pacienteService = new PacienteService(pacienteRepository, VALIDATOR);
         paciente = new Paciente();
         paciente.setId(1L);
         paciente.setNome("João Silva");
         paciente.setEmail("joao@sorrisus.com");
         paciente.setTelefone("83999999999");
-        paciente.setCpf("12345678900");
+        paciente.setCpf("52998224725");
         paciente.setDataNascimento(LocalDate.parse("1990-01-01"));
     }
 
     @Test
     @DisplayName("Deve salvar paciente com sucesso")
     void deveSalvarPaciente() {
-        when(pacienteRepository.existsByCpf("12345678900")).thenReturn(false);
+        when(pacienteRepository.existsByCpf("52998224725")).thenReturn(false);
         when(pacienteRepository.save(any(Paciente.class))).thenReturn(paciente);
 
         Paciente salvo = pacienteService.salvar(paciente);
 
         assertThat(salvo).isNotNull();
         assertThat(salvo.getNome()).isEqualTo("João Silva");
-        assertThat(salvo.getCpf()).isEqualTo("12345678900");
+        assertThat(salvo.getCpf()).isEqualTo("52998224725");
         verify(pacienteRepository, times(1)).save(paciente);
     }
 
@@ -79,19 +84,45 @@ class PacienteServiceTest {
 
         assertThatThrownBy(() -> pacienteService.salvar(paciente))
                 .isInstanceOf(InvalidCPFException.class)
-                .hasMessageContaining("123");
+                .hasMessage("CPF inválido. Verifique o número informado.");
 
         verify(pacienteRepository, never()).save(any(Paciente.class));
     }
 
     @Test
+    @DisplayName("Deve rejeitar CPF com onze dígitos e verificadores inválidos")
+    void deveRejeitarCpfComDigitosVerificadoresInvalidos() {
+        paciente.setCpf("12345678900");
+
+        assertThatThrownBy(() -> pacienteService.salvar(paciente))
+                .isInstanceOf(InvalidCPFException.class)
+                .hasMessage("CPF inválido. Verifique o número informado.");
+
+        verify(pacienteRepository, never()).existsByCpf(any());
+        verify(pacienteRepository, never()).save(any(Paciente.class));
+    }
+
+    @Test
+    @DisplayName("Deve normalizar CPF formatado antes de salvar")
+    void deveNormalizarCpfFormatadoAoSalvar() {
+        paciente.setCpf("529.982.247-25");
+        when(pacienteRepository.save(any(Paciente.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Paciente salvo = pacienteService.salvar(paciente);
+
+        assertThat(salvo.getCpf()).isEqualTo("52998224725");
+        verify(pacienteRepository).existsByCpf("52998224725");
+        verify(pacienteRepository).save(paciente);
+    }
+
+    @Test
     @DisplayName("Deve lançar exceção ao salvar paciente com CPF já existente")
     void deveLancarExcecaoAoSalvarComCpfJaExistente() {
-        when(pacienteRepository.existsByCpf("12345678900")).thenReturn(true);
+        when(pacienteRepository.existsByCpf("52998224725")).thenReturn(true);
 
         assertThatThrownBy(() -> pacienteService.salvar(paciente))
                 .isInstanceOf(CPFAlreadyExistsException.class)
-                .hasMessageContaining("12345678900");
+                .hasMessageContaining("52998224725");
 
         verify(pacienteRepository, never()).save(any(Paciente.class));
     }
@@ -100,7 +131,7 @@ class PacienteServiceTest {
     @DisplayName("Deve lançar exceção ao salvar paciente com data de nascimento futura")
     void deveLancarExcecaoAoSalvarComDataFutura() {
         paciente.setDataNascimento(LocalDate.now().plusDays(1));
-        when(pacienteRepository.existsByCpf("12345678900")).thenReturn(false);
+        when(pacienteRepository.existsByCpf("52998224725")).thenReturn(false);
 
         assertThatThrownBy(() -> pacienteService.salvar(paciente))
                 .isInstanceOf(InvalidFieldException.class)
@@ -113,7 +144,7 @@ class PacienteServiceTest {
     @DisplayName("Deve lançar exceção ao salvar paciente com telefone nulo")
     void deveLancarExcecaoAoSalvarComTelefoneNulo() {
         paciente.setTelefone(null);
-        when(pacienteRepository.existsByCpf("12345678900")).thenReturn(false);
+        when(pacienteRepository.existsByCpf("52998224725")).thenReturn(false);
 
         assertThatThrownBy(() -> pacienteService.salvar(paciente))
                 .isInstanceOf(InvalidFieldException.class)
@@ -126,7 +157,7 @@ class PacienteServiceTest {
     @DisplayName("Deve lançar exceção ao salvar paciente com telefone em branco")
     void deveLancarExcecaoAoSalvarComTelefoneEmBranco() {
         paciente.setTelefone("   ");
-        when(pacienteRepository.existsByCpf("12345678900")).thenReturn(false);
+        when(pacienteRepository.existsByCpf("52998224725")).thenReturn(false);
 
         assertThatThrownBy(() -> pacienteService.salvar(paciente))
                 .isInstanceOf(InvalidFieldException.class)
@@ -155,7 +186,7 @@ class PacienteServiceTest {
         Paciente resultado = pacienteService.buscarPorId(1L);
 
         assertThat(resultado).isNotNull();
-        assertThat(resultado.getCpf()).isEqualTo("12345678900");
+        assertThat(resultado.getCpf()).isEqualTo("52998224725");
         assertThat(resultado.getTelefone()).isEqualTo("83999999999");
         verify(pacienteRepository, times(1)).findById(1L);
     }
@@ -178,18 +209,18 @@ class PacienteServiceTest {
         Paciente atualizado = new Paciente();
         atualizado.setNome("João Atualizado");
         atualizado.setEmail("joao.atualizado@sorrisus.com");
-        atualizado.setCpf("99988877766");
+        atualizado.setCpf("11144477735");
         atualizado.setTelefone("83888888888");
         atualizado.setDataNascimento(LocalDate.parse("1991-02-02"));
 
         when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
-        when(pacienteRepository.existsByCpf("99988877766")).thenReturn(false);
+        when(pacienteRepository.existsByCpf("11144477735")).thenReturn(false);
         when(pacienteRepository.save(any(Paciente.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Paciente resultado = pacienteService.atualizar(1L, atualizado);
 
         assertThat(resultado.getNome()).isEqualTo("João Atualizado");
-        assertThat(resultado.getCpf()).isEqualTo("99988877766");
+        assertThat(resultado.getCpf()).isEqualTo("11144477735");
         assertThat(resultado.getTelefone()).isEqualTo("83888888888");
         assertThat(resultado.getDataNascimento()).isEqualTo(LocalDate.parse("1991-02-02"));
         verify(pacienteRepository, times(1)).findById(1L);
@@ -201,7 +232,8 @@ class PacienteServiceTest {
     void deveManterMesmoCpfAoAtualizar() {
         Paciente atualizado = new Paciente();
         atualizado.setNome("João Atualizado");
-        atualizado.setCpf("12345678900");
+        atualizado.setEmail("joao@sorrisus.com");
+        atualizado.setCpf("529.982.247-25");
         atualizado.setTelefone("83888888888");
 
         when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
@@ -209,7 +241,9 @@ class PacienteServiceTest {
 
         Paciente resultado = pacienteService.atualizar(1L, atualizado);
 
-        assertThat(resultado.getCpf()).isEqualTo("12345678900");
+        assertThat(resultado.getCpf()).isEqualTo("52998224725");
+        verify(pacienteRepository, never()).existsByEmail(any());
+        verify(pacienteRepository, never()).existsByCpf(any());
         verify(pacienteRepository, times(1)).findById(1L);
         verify(pacienteRepository, times(1)).save(any(Paciente.class));
     }
@@ -219,15 +253,16 @@ class PacienteServiceTest {
     void deveLancarExcecaoAoAtualizarComCpfJaExistente() {
         Paciente atualizado = new Paciente();
         atualizado.setNome("João Atualizado");
-        atualizado.setCpf("99988877766");
+        atualizado.setEmail("joao@sorrisus.com");
+        atualizado.setCpf("11144477735");
         atualizado.setTelefone("83888888888");
 
         when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
-        when(pacienteRepository.existsByCpf("99988877766")).thenReturn(true);
+        when(pacienteRepository.existsByCpf("11144477735")).thenReturn(true);
 
         assertThatThrownBy(() -> pacienteService.atualizar(1L, atualizado))
                 .isInstanceOf(CPFAlreadyExistsException.class)
-                .hasMessageContaining("99988877766");
+                .hasMessageContaining("11144477735");
 
         verify(pacienteRepository, never()).save(any(Paciente.class));
     }
@@ -245,7 +280,45 @@ class PacienteServiceTest {
 
         assertThatThrownBy(() -> pacienteService.atualizar(1L, atualizado))
                 .isInstanceOf(InvalidCPFException.class)
-                .hasMessageContaining("123");
+                .hasMessage("CPF inválido. Verifique o número informado.");
+
+        verify(pacienteRepository, never()).save(any(Paciente.class));
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar atualização com CPF de verificadores inválidos")
+    void deveRejeitarAtualizacaoComCpfDeVerificadoresInvalidos() {
+        Paciente atualizado = new Paciente();
+        atualizado.setNome("João Atualizado");
+        atualizado.setEmail("joao@sorrisus.com");
+        atualizado.setCpf("12345678900");
+        atualizado.setTelefone("83888888888");
+
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+
+        assertThatThrownBy(() -> pacienteService.atualizar(1L, atualizado))
+                .isInstanceOf(InvalidCPFException.class)
+                .hasMessage("CPF inválido. Verifique o número informado.");
+
+        verify(pacienteRepository, never()).existsByCpf(any());
+        verify(pacienteRepository, never()).save(any(Paciente.class));
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar e-mail pertencente a outro paciente")
+    void deveRejeitarEmailDeOutroPaciente() {
+        Paciente atualizado = new Paciente();
+        atualizado.setNome("João Atualizado");
+        atualizado.setEmail("outro@sorrisus.com");
+        atualizado.setCpf("52998224725");
+        atualizado.setTelefone("83888888888");
+
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(pacienteRepository.existsByEmail("outro@sorrisus.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> pacienteService.atualizar(1L, atualizado))
+                .isInstanceOf(EmailAlreadyExistsException.class)
+                .hasMessageContaining("outro@sorrisus.com");
 
         verify(pacienteRepository, never()).save(any(Paciente.class));
     }
@@ -255,7 +328,7 @@ class PacienteServiceTest {
     void deveLancarExcecaoAoAtualizarInexistente() {
         Paciente atualizado = new Paciente();
         atualizado.setNome("Nome Qualquer");
-        atualizado.setCpf("12345678900");
+        atualizado.setCpf("52998224725");
         atualizado.setTelefone("83999999999");
 
         when(pacienteRepository.findById(2L)).thenReturn(Optional.empty());
