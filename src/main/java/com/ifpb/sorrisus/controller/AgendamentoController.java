@@ -26,9 +26,9 @@ public class AgendamentoController {
     private final WhatsAppService whatsAppService;
 
     public AgendamentoController(AgendamentoService service,
-                                 PacienteRepository pacienteRepository,
-                                 DentistaRepository dentistaRepository,
-                                 WhatsAppService whatsAppService) {
+            PacienteRepository pacienteRepository,
+            DentistaRepository dentistaRepository,
+            WhatsAppService whatsAppService) {
         this.service = service;
         this.pacienteRepository = pacienteRepository;
         this.dentistaRepository = dentistaRepository;
@@ -42,8 +42,10 @@ public class AgendamentoController {
         ag.setObservacao(dto.getObservacao());
         ag.setServicoId(dto.getServicoId());
 
-        Paciente paciente = pacienteRepository.findById(dto.getPacienteId()).orElseThrow(() -> new ResourceNotFoundException("Paciente não encontrado."));
-        Dentista dentista = dentistaRepository.findById(dto.getDentistaId()).orElseThrow(() -> new ResourceNotFoundException("Dentista não encontrado."));
+        Paciente paciente = pacienteRepository.findById(dto.getPacienteId())
+                .orElseThrow(() -> new ResourceNotFoundException("Paciente não encontrado."));
+        Dentista dentista = dentistaRepository.findById(dto.getDentistaId())
+                .orElseThrow(() -> new ResourceNotFoundException("Dentista não encontrado."));
 
         ag.setPaciente(paciente);
         ag.setDentista(dentista);
@@ -56,7 +58,8 @@ public class AgendamentoController {
         if (paciente.getTelefone() != null) {
             String mensagem = "Olá " + paciente.getNome() + ",\n\n"
                     + "Seu agendamento foi realizado com sucesso.\n"
-                    + "🗓 Data e Horário: " + ag.getDataHora().format(DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm")) + "\n"
+                    + "🗓 Data e Horário: "
+                    + ag.getDataHora().format(DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm")) + "\n"
                     + "📍 Local: Rua Francisco de Melo, 304, centro. Sumé-PB " + "\n\n"
                     + "Por favor, chegue com 10 minutos de antecedência e traga seus documentos pessoais.\n\n"
                     + "Atenciosamente,\n"
@@ -75,8 +78,12 @@ public class AgendamentoController {
         ag.setObservacao(dto.getObservacao());
         ag.setServicoId(dto.getServicoId());
 
-        Paciente paciente = pacienteRepository.findById(dto.getPacienteId()).orElseThrow(() -> new ResourceNotFoundException("Paciente não encontrado."));;
-        Dentista dentista = dentistaRepository.findById(dto.getDentistaId()).orElseThrow(() -> new ResourceNotFoundException("Dentista não encontrado."));;
+        Paciente paciente = pacienteRepository.findById(dto.getPacienteId())
+                .orElseThrow(() -> new ResourceNotFoundException("Paciente não encontrado."));
+        ;
+        Dentista dentista = dentistaRepository.findById(dto.getDentistaId())
+                .orElseThrow(() -> new ResourceNotFoundException("Dentista não encontrado."));
+        ;
 
         ag.setPaciente(paciente);
         ag.setDentista(dentista);
@@ -97,6 +104,12 @@ public class AgendamentoController {
         return ResponseEntity.ok(toDTO(confirmado));
     }
 
+    @PostMapping("/{id}/cancelar")
+    public ResponseEntity<AgendamentoDTO> cancelar(@PathVariable Long id) {
+        Agendamento cancelado = service.cancelar(id);
+        return ResponseEntity.ok(toDTO(cancelado));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<AgendamentoDTO> buscarPorId(@PathVariable Long id) {
         Agendamento a = service.buscarPorId(id);
@@ -105,13 +118,15 @@ public class AgendamentoController {
 
     @GetMapping("/paciente/{pacienteId}")
     public ResponseEntity<List<AgendamentoDTO>> listarPorPaciente(@PathVariable Long pacienteId) {
-        List<AgendamentoDTO> list = service.listarPorPaciente(pacienteId).stream().map(this::toDTO).collect(Collectors.toList());
+        List<AgendamentoDTO> list = service.listarPorPaciente(pacienteId).stream().map(this::toDTO)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
 
     @GetMapping("/dentista/{dentistaId}")
     public ResponseEntity<List<AgendamentoDTO>> listarPorDentista(@PathVariable Long dentistaId) {
-        List<AgendamentoDTO> list = service.listarPorDentista(dentistaId).stream().map(this::toDTO).collect(Collectors.toList());
+        List<AgendamentoDTO> list = service.listarPorDentista(dentistaId).stream().map(this::toDTO)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
 
@@ -123,8 +138,11 @@ public class AgendamentoController {
         dto.setDentistaId(a.getDentista().getId());
         dto.setServicoId(a.getServicoId());
         dto.setConfirmado(a.isConfirmado());
+        dto.setStatus(a.getStatus() != null ? a.getStatus()
+                : (a.isConfirmado() ? StatusConsulta.CONFIRMADA : StatusConsulta.PENDENTE));
         dto.setObservacao(a.getObservacao());
-        if (a.getCriadoPor() != null) dto.setRecepcionistaId(a.getCriadoPor().getId());
+        if (a.getCriadoPor() != null)
+            dto.setRecepcionistaId(a.getCriadoPor().getId());
         return dto;
     }
 }

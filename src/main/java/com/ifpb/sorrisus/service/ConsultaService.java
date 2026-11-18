@@ -20,10 +20,10 @@ public class ConsultaService {
     private final AgendamentoRepository agendamentoRepository;
 
     public ConsultaService(ConsultaRepository consultaRepository,
-                           PacienteRepository pacienteRepository,
-                           DentistaRepository dentistaRepository,
-                           ProntuarioRepository prontuarioRepository,
-                           AgendamentoRepository agendamentoRepository) {
+            PacienteRepository pacienteRepository,
+            DentistaRepository dentistaRepository,
+            ProntuarioRepository prontuarioRepository,
+            AgendamentoRepository agendamentoRepository) {
         this.consultaRepository = consultaRepository;
         this.pacienteRepository = pacienteRepository;
         this.dentistaRepository = dentistaRepository;
@@ -35,12 +35,15 @@ public class ConsultaService {
         boolean conflitoConsulta;
 
         if (consultaId == null) {
-            conflitoConsulta = consultaRepository.existsByDentistaAndDataHora(dentista, dataHora);
+            conflitoConsulta = consultaRepository.existsByDentistaAndDataHoraAndStatusNot(
+                    dentista, dataHora, StatusConsulta.CANCELADA);
         } else {
-            conflitoConsulta = consultaRepository.existsByDentistaAndDataHoraAndIdNot(dentista, dataHora, consultaId);
+            conflitoConsulta = consultaRepository.existsByDentistaAndDataHoraAndIdNotAndStatusNot(
+                    dentista, dataHora, consultaId, StatusConsulta.CANCELADA);
         }
 
-        boolean conflitoAgendamento = agendamentoRepository.existsByDentistaAndDataHora(dentista, dataHora);
+        boolean conflitoAgendamento = agendamentoRepository.existsByDentistaAndDataHoraAndStatusNot(
+                dentista, dataHora, StatusConsulta.CANCELADA);
 
         if (conflitoConsulta || conflitoAgendamento) {
             throw new BusinessException("Horário indisponível. Existe um Agendamento ou Consulta para este dentista.");
@@ -76,12 +79,12 @@ public class ConsultaService {
         Consulta existente = buscarPorId(id);
 
         if (existente.getStatus() == StatusConsulta.CANCELADA) {
-             throw new BusinessException("Não é possível editar uma consulta cancelada.");
+            throw new BusinessException("Não é possível editar uma consulta cancelada.");
         }
 
         if (atualizado.getDataHora() != null && !atualizado.getDataHora().equals(existente.getDataHora())) {
-             validarConflito(existente.getDentista(), atualizado.getDataHora(), id);
-             existente.setDataHora(atualizado.getDataHora());
+            validarConflito(existente.getDentista(), atualizado.getDataHora(), id);
+            existente.setDataHora(atualizado.getDataHora());
         }
 
         if (atualizado.getStatus() != null) {
@@ -115,6 +118,26 @@ public class ConsultaService {
         consultaRepository.save(consulta);
     }
 
+    @Transactional
+    public Consulta finalizar(Long id) {
+        Consulta consulta = buscarPorId(id);
+        if (consulta.getStatus() == StatusConsulta.CANCELADA || consulta.getStatus() == StatusConsulta.NAO_COMPARECEU) {
+            throw new BusinessException("Não é possível finalizar uma consulta cancelada ou marcada como falta.");
+        }
+        consulta.setStatus(StatusConsulta.REALIZADA);
+        return consultaRepository.save(consulta);
+    }
+
+    @Transactional
+    public Consulta marcarNaoCompareceu(Long id) {
+        Consulta consulta = buscarPorId(id);
+        if (consulta.getStatus() == StatusConsulta.REALIZADA || consulta.getStatus() == StatusConsulta.CANCELADA) {
+            throw new BusinessException("Não é possível registrar falta para uma consulta já realizada ou cancelada.");
+        }
+        consulta.setStatus(StatusConsulta.NAO_COMPARECEU);
+        return consultaRepository.save(consulta);
+    }
+
     public Consulta buscarPorId(Long id) {
         return consultaRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Consulta não encontrada."));
@@ -127,15 +150,17 @@ public class ConsultaService {
     }
 
     public List<Consulta> listarPorDentista(Long dentistaId) {
-         Dentista dentista = dentistaRepository.findById(dentistaId)
+        Dentista dentista = dentistaRepository.findById(dentistaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Dentista não encontrado."));
-        return consultaRepository.findByDentistaAndDataHoraBetween(dentista, LocalDateTime.now().minusYears(1), LocalDateTime.now().plusYears(1));
+        return consultaRepository.findByDentistaAndDataHoraBetween(dentista, LocalDateTime.now().minusYears(1),
+                LocalDateTime.now().plusYears(1));
     }
 
     public List<RetornoPendente> verificarRetornosPendentes() {
         LocalDateTime agora = LocalDateTime.now();
         LocalDateTime seisMesesAtras = agora.minusMonths(6);
-        List<Paciente> pacientesComRetornoPendente = consultaRepository.findPacientesComUltimaConsultaAntesDe(seisMesesAtras);
+        List<Paciente> pacientesComRetornoPendente = consultaRepository
+                .findPacientesComUltimaConsultaAntesDe(seisMesesAtras);
 
         List<RetornoPendente> retornosPendentes = new ArrayList<>();
 
@@ -153,14 +178,16 @@ public class ConsultaService {
                 retornoPendente.setPaciente(paciente);
                 retornoPendente.setUltimaConsulta(ultimaConsulta);
                 retornoPendente.setDataUltimaConsulta(ultimaConsulta.getDataHora());
-                retornoPendente.setDiasDesdeUltimaConsulta(calcularDiasDesdeUltimaConsulta(ultimaConsulta.getDataHora(), agora));
+                retornoPendente.setDiasDesdeUltimaConsulta(
+                        calcularDiasDesdeUltimaConsulta(ultimaConsulta.getDataHora(), agora));
                 retornoPendente.setPrioridade(calcularPrioridade(ultimaConsulta.getDataHora(), agora));
 
                 retornosPendentes.add(retornoPendente);
             }
         }
 
-        retornosPendentes.sort((r1, r2) -> Integer.compare(r2.getDiasDesdeUltimaConsulta(), r1.getDiasDesdeUltimaConsulta()));
+        retornosPendentes
+                .sort((r1, r2) -> Integer.compare(r2.getDiasDesdeUltimaConsulta(), r1.getDiasDesdeUltimaConsulta()));
 
         return retornosPendentes;
     }
@@ -176,8 +203,7 @@ public class ConsultaService {
         return consultaRepository.existsByPacienteAndDataHoraGreaterThanEqualAndStatusIn(
                 paciente,
                 agora,
-                List.of(StatusConsulta.PENDENTE, StatusConsulta.CONFIRMADA)
-        );
+                List.of(StatusConsulta.PENDENTE, StatusConsulta.CONFIRMADA));
     }
 
     public List<RetornoPendente> verificarRetornosPendentesPorDentista(Long dentistaId) {

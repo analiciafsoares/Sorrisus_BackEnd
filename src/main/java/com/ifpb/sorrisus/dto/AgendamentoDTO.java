@@ -1,5 +1,6 @@
 package com.ifpb.sorrisus.dto;
 
+import com.ifpb.sorrisus.model.StatusConsulta;
 import lombok.Data;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
@@ -20,5 +21,6 @@ public class AgendamentoDTO {
     private Long servicoId;
     private Long recepcionistaId;
     private Boolean confirmado;
+    private StatusConsulta status;
     private String observacao;
 }

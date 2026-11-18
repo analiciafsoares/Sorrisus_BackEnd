@@ -80,6 +80,16 @@ public class ConsultaController {
         return ResponseEntity.ok(toDTO(salvo));
     }
 
+    @PostMapping("/{id}/finalizar")
+    public ResponseEntity<ConsultaDTO> finalizar(@PathVariable Long id) {
+        return ResponseEntity.ok(toDTO(service.finalizar(id)));
+    }
+
+    @PostMapping("/{id}/nao-compareceu")
+    public ResponseEntity<ConsultaDTO> marcarNaoCompareceu(@PathVariable Long id) {
+        return ResponseEntity.ok(toDTO(service.marcarNaoCompareceu(id)));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> cancelar(@PathVariable Long id) {
         service.cancelar(id);
@@ -98,7 +108,7 @@ public class ConsultaController {
                 .map(this::toDTO).collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
-  
+
     @GetMapping("/dentista/{dentistaId}")
     public ResponseEntity<List<ConsultaDTO>> listarPorDentista(@PathVariable Long dentistaId) {
 
@@ -129,7 +139,6 @@ public class ConsultaController {
 
         return ResponseEntity.ok(retornos);
     }
-
 
     private RetornoPendenteDTO toRetornoDTO(RetornoPendente r) {
         RetornoPendenteDTO dto = new RetornoPendenteDTO();

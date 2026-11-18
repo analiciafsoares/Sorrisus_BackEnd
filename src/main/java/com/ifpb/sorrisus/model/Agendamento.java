@@ -24,6 +24,10 @@ public class Agendamento {
     @Column(nullable = false)
     private boolean confirmado = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20, nullable = false)
+    private StatusConsulta status = StatusConsulta.PENDENTE;
+
     @ManyToOne
     @JoinColumn(name = "paciente_id", nullable = false)
     private Paciente paciente;

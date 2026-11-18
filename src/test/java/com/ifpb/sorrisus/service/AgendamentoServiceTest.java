@@ -18,6 +18,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,10 +27,14 @@ class AgendamentoServiceTest {
     @InjectMocks
     private AgendamentoService service;
 
-    @Mock private AgendamentoRepository agendamentoRepository;
-    @Mock private PacienteRepository pacienteRepository;
-    @Mock private DentistaRepository dentistaRepository;
-    @Mock private ConsultaRepository consultaRepository;
+    @Mock
+    private AgendamentoRepository agendamentoRepository;
+    @Mock
+    private PacienteRepository pacienteRepository;
+    @Mock
+    private DentistaRepository dentistaRepository;
+    @Mock
+    private ConsultaRepository consultaRepository;
 
     private Agendamento agendamento;
     private Dentista dentista;
@@ -37,15 +42,18 @@ class AgendamentoServiceTest {
 
     @BeforeEach
     void setUp() {
-        dentista = new Dentista(); dentista.setId(1L);
-        paciente = new Paciente(); paciente.setId(1L);
-        
+        dentista = new Dentista();
+        dentista.setId(1L);
+        paciente = new Paciente();
+        paciente.setId(1L);
+
         agendamento = new Agendamento();
         agendamento.setId(1L);
         agendamento.setDataHora(LocalDateTime.now().plusDays(1));
         agendamento.setDentista(dentista);
         agendamento.setPaciente(paciente);
         agendamento.setConfirmado(false);
+        agendamento.setStatus(StatusConsulta.PENDENTE);
     }
 
     @Test
@@ -53,13 +61,16 @@ class AgendamentoServiceTest {
     void deveCriarAgendamentoSucesso() {
         when(dentistaRepository.findById(1L)).thenReturn(Optional.of(dentista));
         when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
-        when(agendamentoRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(false);
-        when(consultaRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(false);
+        when(agendamentoRepository.existsByDentistaAndDataHoraAndStatusNot(any(), any(), eq(StatusConsulta.CANCELADA)))
+                .thenReturn(false);
+        when(consultaRepository.existsByDentistaAndDataHoraAndStatusNot(any(), any(), eq(StatusConsulta.CANCELADA)))
+                .thenReturn(false);
         when(agendamentoRepository.save(any())).thenReturn(agendamento);
 
         Agendamento salvo = service.criar(agendamento);
 
         assertNotNull(salvo);
+        assertEquals(StatusConsulta.PENDENTE, salvo.getStatus());
         verify(agendamentoRepository).save(any(Agendamento.class));
     }
 
@@ -75,7 +86,8 @@ class AgendamentoServiceTest {
     void deveLancarErroConflitoCriacao() {
         when(dentistaRepository.findById(1L)).thenReturn(Optional.of(dentista));
         when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
-        when(agendamentoRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(true);
+        when(agendamentoRepository.existsByDentistaAndDataHoraAndStatusNot(any(), any(), eq(StatusConsulta.CANCELADA)))
+                .thenReturn(true);
 
         assertThrows(BusinessException.class, () -> service.criar(agendamento));
     }
@@ -86,16 +98,19 @@ class AgendamentoServiceTest {
         Agendamento atualizado = new Agendamento();
         atualizado.setDentista(dentista);
         atualizado.setPaciente(paciente);
-        atualizado.setDataHora(LocalDateTime.now().plusDays(3)); // Nova data
+        atualizado.setDataHora(LocalDateTime.now().plusDays(3));
 
         when(agendamentoRepository.findById(1L)).thenReturn(Optional.of(agendamento));
         when(dentistaRepository.findById(1L)).thenReturn(Optional.of(dentista));
         when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
-        when(agendamentoRepository.existsByDentistaAndDataHoraAndIdNot(any(), any(), eq(1L))).thenReturn(false);
+        when(agendamentoRepository.existsByDentistaAndDataHoraAndIdNotAndStatusNot(any(), any(), eq(1L),
+                eq(StatusConsulta.CANCELADA))).thenReturn(false);
+        when(consultaRepository.existsByDentistaAndDataHoraAndStatusNot(any(), any(), eq(StatusConsulta.CANCELADA)))
+                .thenReturn(false);
         when(agendamentoRepository.save(any())).thenReturn(atualizado);
 
         Agendamento res = service.atualizar(1L, atualizado);
-        
+
         assertEquals(atualizado.getDataHora(), res.getDataHora());
         verify(agendamentoRepository).save(any());
     }
@@ -104,6 +119,7 @@ class AgendamentoServiceTest {
     @DisplayName("Não deve permitir atualizar agendamento já confirmado")
     void naoDeveAtualizarConfirmado() {
         agendamento.setConfirmado(true);
+        agendamento.setStatus(StatusConsulta.CONFIRMADA);
         when(agendamentoRepository.findById(1L)).thenReturn(Optional.of(agendamento));
 
         assertThrows(BusinessException.class, () -> service.atualizar(1L, agendamento));
@@ -120,7 +136,8 @@ class AgendamentoServiceTest {
         when(agendamentoRepository.findById(1L)).thenReturn(Optional.of(agendamento));
         when(dentistaRepository.findById(1L)).thenReturn(Optional.of(dentista));
         when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
-        when(agendamentoRepository.existsByDentistaAndDataHoraAndIdNot(any(), any(), eq(1L))).thenReturn(true);
+        when(agendamentoRepository.existsByDentistaAndDataHoraAndIdNotAndStatusNot(any(), any(), eq(1L),
+                eq(StatusConsulta.CANCELADA))).thenReturn(true);
 
         assertThrows(BusinessException.class, () -> service.atualizar(1L, novo));
     }
@@ -129,12 +146,14 @@ class AgendamentoServiceTest {
     @DisplayName("Deve confirmar agendamento e criar consulta")
     void deveConfirmarAgendamento() {
         when(agendamentoRepository.findById(1L)).thenReturn(Optional.of(agendamento));
-        when(consultaRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(false);
+        when(consultaRepository.existsByDentistaAndDataHoraAndStatusNot(any(), any(), eq(StatusConsulta.CANCELADA)))
+                .thenReturn(false);
         when(agendamentoRepository.save(any())).thenReturn(agendamento);
 
         service.confirmar(1L);
 
         assertTrue(agendamento.isConfirmado());
+        assertEquals(StatusConsulta.CONFIRMADA, agendamento.getStatus());
         verify(consultaRepository).save(any(Consulta.class));
     }
 
@@ -142,9 +161,24 @@ class AgendamentoServiceTest {
     @DisplayName("Deve impedir confirmação se já existe consulta no horário (Conflito tardio)")
     void deveFalharConfirmacaoSeConsultaExiste() {
         when(agendamentoRepository.findById(1L)).thenReturn(Optional.of(agendamento));
-        when(consultaRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(true);
+        when(consultaRepository.existsByDentistaAndDataHoraAndStatusNot(any(), any(), eq(StatusConsulta.CANCELADA)))
+                .thenReturn(true);
 
         assertThrows(BusinessException.class, () -> service.confirmar(1L));
+    }
+
+    @Test
+    @DisplayName("Deve cancelar agendamento mantendo registro como CANCELADA")
+    void deveCancelarAgendamento() {
+        when(agendamentoRepository.findById(1L)).thenReturn(Optional.of(agendamento));
+        when(consultaRepository.findByDentistaAndDataHoraBetween(any(), any(), any())).thenReturn(List.of());
+        when(agendamentoRepository.save(any())).thenReturn(agendamento);
+
+        Agendamento cancelado = service.cancelar(1L);
+
+        assertFalse(cancelado.isConfirmado());
+        assertEquals(StatusConsulta.CANCELADA, cancelado.getStatus());
+        verify(agendamentoRepository).save(agendamento);
     }
 
     @Test

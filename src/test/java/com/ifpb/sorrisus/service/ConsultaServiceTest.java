@@ -29,11 +29,16 @@ class ConsultaServiceTest {
     @InjectMocks
     private ConsultaService service;
 
-    @Mock private ConsultaRepository consultaRepository;
-    @Mock private PacienteRepository pacienteRepository;
-    @Mock private DentistaRepository dentistaRepository;
-    @Mock private ProntuarioRepository prontuarioRepository;
-    @Mock private AgendamentoRepository agendamentoRepository;
+    @Mock
+    private ConsultaRepository consultaRepository;
+    @Mock
+    private PacienteRepository pacienteRepository;
+    @Mock
+    private DentistaRepository dentistaRepository;
+    @Mock
+    private ProntuarioRepository prontuarioRepository;
+    @Mock
+    private AgendamentoRepository agendamentoRepository;
 
     private Consulta consulta;
     private Dentista dentista;
@@ -41,9 +46,11 @@ class ConsultaServiceTest {
 
     @BeforeEach
     void setUp() {
-        dentista = new Dentista(); dentista.setId(1L);
-        paciente = new Paciente(); paciente.setId(1L);
-        
+        dentista = new Dentista();
+        dentista.setId(1L);
+        paciente = new Paciente();
+        paciente.setId(1L);
+
         consulta = new Consulta();
         consulta.setId(10L);
         consulta.setDataHora(LocalDateTime.now().plusDays(2));
@@ -55,18 +62,20 @@ class ConsultaServiceTest {
     @Test
     @DisplayName("Deve criar consulta manual com sucesso e salvar prontuário se vier junto")
     void deveCriarConsultaComProntuario() {
-        consulta.setProntuario(new Prontuario()); 
+        consulta.setProntuario(new Prontuario());
 
         when(dentistaRepository.findById(1L)).thenReturn(Optional.of(dentista));
         when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
-        when(consultaRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(false);
-        when(agendamentoRepository.existsByDentistaAndDataHora(any(), any())).thenReturn(false);
-        when(prontuarioRepository.save(any())).thenReturn(new Prontuario()); 
+        when(consultaRepository.existsByDentistaAndDataHoraAndStatusNot(any(), any(), eq(StatusConsulta.CANCELADA)))
+                .thenReturn(false);
+        when(agendamentoRepository.existsByDentistaAndDataHoraAndStatusNot(any(), any(), eq(StatusConsulta.CANCELADA)))
+                .thenReturn(false);
+        when(prontuarioRepository.save(any())).thenReturn(new Prontuario());
         when(consultaRepository.save(any())).thenReturn(consulta);
 
         Consulta salva = service.criar(consulta);
         assertNotNull(salva);
-        verify(prontuarioRepository).save(any()); 
+        verify(prontuarioRepository).save(any());
     }
 
     @Test
@@ -82,10 +91,13 @@ class ConsultaServiceTest {
     @DisplayName("Deve atualizar data da consulta (sem conflito)")
     void deveAtualizarDataConsulta() {
         Consulta atualizacao = new Consulta();
-        atualizacao.setDataHora(LocalDateTime.now().plusDays(5)); 
+        atualizacao.setDataHora(LocalDateTime.now().plusDays(5));
 
         when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
-        when(consultaRepository.existsByDentistaAndDataHoraAndIdNot(any(), any(), eq(10L))).thenReturn(false);
+        when(consultaRepository.existsByDentistaAndDataHoraAndIdNotAndStatusNot(any(), any(), eq(10L),
+                eq(StatusConsulta.CANCELADA))).thenReturn(false);
+        when(agendamentoRepository.existsByDentistaAndDataHoraAndStatusNot(any(), any(), eq(StatusConsulta.CANCELADA)))
+                .thenReturn(false);
         when(consultaRepository.save(any())).thenReturn(consulta);
 
         service.atualizar(10L, atualizacao);
@@ -101,7 +113,8 @@ class ConsultaServiceTest {
         atualizacao.setDataHora(LocalDateTime.now().plusDays(5));
 
         when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
-        when(consultaRepository.existsByDentistaAndDataHoraAndIdNot(any(), any(), eq(10L))).thenReturn(true);
+        when(consultaRepository.existsByDentistaAndDataHoraAndIdNotAndStatusNot(any(), any(), eq(10L),
+                eq(StatusConsulta.CANCELADA))).thenReturn(true);
 
         assertThrows(BusinessException.class, () -> service.atualizar(10L, atualizacao));
     }
@@ -122,7 +135,27 @@ class ConsultaServiceTest {
         service.cancelar(10L);
         assertEquals(StatusConsulta.CANCELADA, consulta.getStatus());
     }
-    
+
+    @Test
+    @DisplayName("Deve finalizar consulta marcando como REALIZADA")
+    void deveFinalizarConsulta() {
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+        when(consultaRepository.save(any())).thenReturn(consulta);
+
+        Consulta finalizada = service.finalizar(10L);
+        assertEquals(StatusConsulta.REALIZADA, finalizada.getStatus());
+    }
+
+    @Test
+    @DisplayName("Deve registrar falta marcando como NAO_COMPARECEU")
+    void deveRegistrarFalta() {
+        when(consultaRepository.findById(10L)).thenReturn(Optional.of(consulta));
+        when(consultaRepository.save(any())).thenReturn(consulta);
+
+        Consulta falta = service.marcarNaoCompareceu(10L);
+        assertEquals(StatusConsulta.NAO_COMPARECEU, falta.getStatus());
+    }
+
     @Test
     @DisplayName("Deve lançar erro ao buscar consulta inexistente")
     void deveFalharBuscaInexistente() {
@@ -178,8 +211,7 @@ class ConsultaServiceTest {
         verify(consultaRepository).existsByPacienteAndDataHoraGreaterThanEqualAndStatusIn(
                 eq(paciente),
                 any(),
-                statusCaptor.capture()
-        );
+                statusCaptor.capture());
         assertEquals(List.of(StatusConsulta.PENDENTE, StatusConsulta.CONFIRMADA), List.copyOf(statusCaptor.getValue()));
         assertFalse(statusCaptor.getValue().contains(StatusConsulta.CANCELADA));
         assertFalse(statusCaptor.getValue().contains(StatusConsulta.REALIZADA));
