@@ -3,25 +3,37 @@ package com.ifpb.sorrisus.service;
 import com.ifpb.sorrisus.exception.*;
 import com.ifpb.sorrisus.model.Paciente;
 import com.ifpb.sorrisus.repository.PacienteRepository;
+import jakarta.validation.Validator;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class PacienteService {
 
     private final PacienteRepository pacienteRepository;
+    private final Validator validator;
 
-    public PacienteService(PacienteRepository pacienteRepository) {
+    public PacienteService(PacienteRepository pacienteRepository, Validator validator) {
         this.pacienteRepository = pacienteRepository;
+        this.validator = validator;
     }
 
     private boolean cpfValido(String cpf) {
-        return cpf != null && cpf.matches("\\d{11}");
+        return cpf != null
+                && cpf.matches("\\d{11}")
+                && validator.validateValue(Paciente.class, "cpf", cpf).isEmpty();
+    }
+
+    private String normalizarCpf(String cpf) {
+        return cpf == null ? null : cpf.replaceAll("\\D", "");
     }
 
     public Paciente salvar(Paciente paciente) {
+
+        paciente.setCpf(normalizarCpf(paciente.getCpf()));
 
         if (paciente.getEmail() == null || paciente.getEmail().isBlank()) {
             throw new InvalidFieldException("email", "O email é obrigatório.");
@@ -35,7 +47,7 @@ public class PacienteService {
         }
 
         if (!cpfValido(paciente.getCpf())) {
-            throw new InvalidCPFException(paciente.getCpf());
+            throw new InvalidCPFException();
         }
 
         if (pacienteRepository.existsByCpf(paciente.getCpf())) {
@@ -66,23 +78,24 @@ public class PacienteService {
 
     public Paciente atualizar(Long id, Paciente atualizado) {
         Paciente existente = buscarPorId(id);
+        String cpfNormalizado = normalizarCpf(atualizado.getCpf());
 
-        if (!existente.getEmail().equals(atualizado.getEmail())
+        if (!cpfValido(cpfNormalizado)) {
+            throw new InvalidCPFException();
+        }
+
+        if (!Objects.equals(existente.getEmail(), atualizado.getEmail())
                 && pacienteRepository.existsByEmail(atualizado.getEmail())) {
             throw new EmailAlreadyExistsException(atualizado.getEmail());
         }
 
-        if (!existente.getCpf().equals(atualizado.getCpf())
-                && pacienteRepository.existsByCpf(atualizado.getCpf())) {
-            throw new CPFAlreadyExistsException(atualizado.getCpf());
-        }
-
-        if (!cpfValido(atualizado.getCpf())) {
-            throw new InvalidCPFException(atualizado.getCpf());
+        if (!Objects.equals(existente.getCpf(), cpfNormalizado)
+                && pacienteRepository.existsByCpf(cpfNormalizado)) {
+            throw new CPFAlreadyExistsException(cpfNormalizado);
         }
 
         existente.setNome(atualizado.getNome());
-        existente.setCpf(atualizado.getCpf());
+        existente.setCpf(cpfNormalizado);
         existente.setTelefone(atualizado.getTelefone());
         existente.setDataNascimento(atualizado.getDataNascimento());
         existente.setEmail(atualizado.getEmail());

@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -118,6 +119,21 @@ public class GlobalExceptionHandler {
                                                 HttpStatus.BAD_REQUEST,
                                                 mensagemErro.trim(),
                                                 request.getRequestURI()));
+        }
+
+        @ExceptionHandler(TransactionSystemException.class)
+        public ResponseEntity<?> handleTransactionSystemException(TransactionSystemException ex,
+                        HttpServletRequest request) {
+                Throwable causa = ex;
+
+                while (causa != null) {
+                        if (causa instanceof ConstraintViolationException constraintViolationException) {
+                                return handleConstraintViolation(constraintViolationException, request);
+                        }
+                        causa = causa.getCause();
+                }
+
+                return handleGeneric(ex, request);
         }
 
 }
