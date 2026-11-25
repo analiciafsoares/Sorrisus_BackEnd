@@ -170,7 +170,7 @@
                 "cadastro"
               ]
             },
-            "description": "Rota pública (sem token). Atenção: hoje este cadastro é público; a restrição faz parte das correções de segurança pendentes.",
+            "description": "Perfil: somente dentista (administrador da clínica). O campo \"senha\" é a senha provisória (mínimo 6 caracteres), que o profissional deve trocar no primeiro acesso.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"nome\": \"João Pereira\",\n  \"email\": \"joao.pereira@sorrisus.com\",\n  \"senha\": \"12345678\",\n  \"role\": \"ROLE_RECEPCIONISTA\"\n}",
@@ -179,9 +179,6 @@
                   "language": "json"
                 }
               }
-            },
-            "auth": {
-              "type": "noauth"
             }
           },
           "response": [],
@@ -250,7 +247,7 @@
                 "{{usuarioId}}"
               ]
             },
-            "description": "Perfil: qualquer usuário autenticado."
+            "description": "Perfil: somente dentista (administrador da clínica)."
           },
           "response": []
         }
@@ -319,7 +316,7 @@
                 "cadastro"
               ]
             },
-            "description": "Rota pública (sem token). Atenção: hoje este cadastro é público; a restrição faz parte das correções de segurança pendentes.",
+            "description": "Perfil: somente dentista (administrador da clínica). O campo \"senha\" é a senha provisória (mínimo 6 caracteres), que o profissional deve trocar no primeiro acesso.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"nome\": \"Dra. Ana Paula\",\n  \"email\": \"ana.paula@sorrisus.com\",\n  \"senha\": \"senhaSegura123\",\n  \"cro\": \"98765-PB\",\n  \"especialidade\": \"Ortodontia\",\n  \"role\": \"ROLE_DENTISTA\"\n}",
@@ -328,9 +325,6 @@
                   "language": "json"
                 }
               }
-            },
-            "auth": {
-              "type": "noauth"
             }
           },
           "response": [],
@@ -399,7 +393,7 @@
                 "{{dentistaId}}"
               ]
             },
-            "description": "Perfil: qualquer usuário autenticado."
+            "description": "Perfil: somente dentista (administrador da clínica)."
           },
           "response": []
         }
@@ -468,7 +462,7 @@
                 "cadastro"
               ]
             },
-            "description": "Rota pública (sem token). Atenção: hoje este cadastro é público; a restrição faz parte das correções de segurança pendentes.",
+            "description": "Perfil: somente dentista (administrador da clínica). O campo \"senha\" é a senha provisória (mínimo 6 caracteres), que o profissional deve trocar no primeiro acesso.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"nome\": \"Fernanda Alves\",\n  \"email\": \"fernanda.alves@sorrisus.com\",\n  \"senha\": \"senhaSegura123\",\n  \"turno\": \"TARDE\",\n  \"role\": \"ROLE_RECEPCIONISTA\"\n}",
@@ -477,9 +471,6 @@
                   "language": "json"
                 }
               }
-            },
-            "auth": {
-              "type": "noauth"
             }
           },
           "response": [],
@@ -548,7 +539,7 @@
                 "{{recepcionistaId}}"
               ]
             },
-            "description": "Perfil: qualquer usuário autenticado."
+            "description": "Perfil: somente dentista (administrador da clínica)."
           },
           "response": []
         }
@@ -718,7 +709,10 @@
                 "servicos"
               ]
             },
-            "description": "Perfil: qualquer usuário autenticado."
+            "description": "Rota pública (sem token): usada pelo portfólio de serviços.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "response": []
         },
@@ -738,7 +732,10 @@
                 "{{servicoId}}"
               ]
             },
-            "description": "Perfil: qualquer usuário autenticado."
+            "description": "Rota pública (sem token): usada pelo portfólio de serviços.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "response": []
         },

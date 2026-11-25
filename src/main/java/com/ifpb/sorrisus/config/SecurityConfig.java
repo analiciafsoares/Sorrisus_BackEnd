@@ -7,6 +7,7 @@ import com.ifpb.sorrisus.security.handler.CustomAuthenticationEntryPoint;
 import com.ifpb.sorrisus.security.service.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -37,7 +38,7 @@ public class SecurityConfig {
         this.jwtUtil = jwtUtil;
         this.customAuthenticationEntryPoint = customAuthenticationEntryPoint;
         this.customAccessDeniedHandler = customAccessDeniedHandler;
-        this.corsConfigurationSource = corsConfigurationSource; 
+        this.corsConfigurationSource = corsConfigurationSource;
     }
 
     @Bean
@@ -64,11 +65,8 @@ public class SecurityConfig {
                     .accessDeniedHandler(customAccessDeniedHandler)
             )
             .authorizeHttpRequests(authorize -> authorize
-                    .requestMatchers("/api/auth/**",
-                            "/api/usuarios/cadastro",
-                            "/api/dentistas/cadastro",
-                            "/api/recepcionistas/cadastro"
-                    ).permitAll()
+                    .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/servicos", "/api/servicos/*").permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                     .anyRequest().authenticated()
             )

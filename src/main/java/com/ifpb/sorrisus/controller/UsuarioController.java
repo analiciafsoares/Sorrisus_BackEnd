@@ -1,10 +1,12 @@
 package com.ifpb.sorrisus.controller;
 
+import com.ifpb.sorrisus.exception.InvalidFieldException;
 import com.ifpb.sorrisus.dto.AlterarSenhaDTO;
 import com.ifpb.sorrisus.model.Usuario;
 import com.ifpb.sorrisus.service.UsuarioService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -35,7 +37,11 @@ public class UsuarioController {
     }
 
     @PostMapping("/cadastro")
+    @PreAuthorize("hasAuthority('ROLE_DENTISTA')")
     public ResponseEntity<Usuario> criar(@RequestBody Usuario usuario) {
+        if (usuario.getSenha() == null || usuario.getSenha().length() < 6) {
+            throw new InvalidFieldException("senha", "Informe uma senha provisória com pelo menos 6 caracteres.");
+        }
         usuario.setSenha(passwordEncoder.encode(usuario.getSenha()));
         return ResponseEntity.ok(service.salvar(usuario));
     }
@@ -46,6 +52,7 @@ public class UsuarioController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_DENTISTA')")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();
