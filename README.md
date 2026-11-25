@@ -31,11 +31,15 @@ O token expira após o tempo definido em `JWT_EXPIRATION_MS`. A resposta do logi
 ### Rotas públicas (sem autenticação)
 
 - `POST /api/auth/login`
-- `POST /api/usuarios/cadastro`
-- `POST /api/dentistas/cadastro`
-- `POST /api/recepcionistas/cadastro`
+- `GET /api/servicos` e `GET /api/servicos/{id}` (portfólio público de serviços)
 
 Todas as demais rotas **exigem autenticação**.
+
+### Cadastro de profissionais e conta inicial
+
+Dentistas e recepcionistas são cadastrados **somente por um dentista**, que atua como administrador da clínica (`POST /api/dentistas/cadastro` e `POST /api/recepcionistas/cadastro`). O dentista define uma **senha provisória** (mínimo de 6 caracteres), que o profissional deve trocar no primeiro acesso.
+
+Como nenhum cadastro é público, a **primeira conta de dentista** é criada automaticamente na inicialização, a partir das variáveis `DENTISTA_INICIAL_*` (ver **Configurar variáveis de ambiente**). Ela só é criada quando ainda **não existe nenhum dentista** no banco; depois disso, as variáveis são ignoradas e podem ser removidas.
 
 > **O paciente não se autocadastra.** O cadastro de pacientes (`POST /api/pacientes/cadastro`) exige login de dentista ou recepcionista. A equipe não precisa definir a senha: quando o campo `senha` não é enviado, a **senha inicial é o CPF do paciente (somente números)**. O paciente deve trocá-la no primeiro acesso.
 
@@ -46,8 +50,6 @@ Qualquer usuário autenticado pode trocar a sua senha:
 * **Endpoint:** `PUT /api/usuarios/me/senha`
 * **Corpo:** `{ "senhaAtual": "...", "novaSenha": "..." }`
 * **Regras:** o usuário é identificado pelo token (ninguém altera a senha de outra pessoa); a senha atual precisa conferir; a nova senha deve ter pelo menos 6 caracteres e ser diferente da atual. Responde **204** em caso de sucesso.
->
-> As rotas de cadastro de usuários, dentistas e recepcionistas ainda são públicas. Pelas regras do sistema, o cadastro de profissionais deve ser feito apenas por um dentista; essa restrição está pendente.
 
 ### Permissões por perfil
 
@@ -56,6 +58,7 @@ Além de exigir login, alguns endpoints são restritos por perfil (`@PreAuthoriz
 | Ação | Perfis permitidos |
 | :--- | :--- |
 | Criar, editar, confirmar, cancelar e excluir agendamentos | Dentista, Recepcionista |
+| Cadastrar e excluir dentistas, recepcionistas e usuários | Dentista |
 | Cadastrar pacientes | Dentista, Recepcionista |
 | Criar, editar e desativar serviços | Dentista, Recepcionista |
 | Registrar não comparecimento | Dentista, Recepcionista |
@@ -63,6 +66,7 @@ Além de exigir login, alguns endpoints são restritos por perfil (`@PreAuthoriz
 | Salvar e excluir ficha clínica (prontuário/anamnese) | Dentista |
 | Histórico de consultas da clínica (`/consultas/historico/recepcao`) | Recepcionista |
 | Alterar a própria senha (`/usuarios/me/senha`) | Qualquer usuário autenticado |
+| Consultar serviços (portfólio) | Público (sem login) |
 | Demais consultas (listagens, buscas por ID, retornos pendentes) | Qualquer usuário autenticado |
 
 Os perfis existentes são `ROLE_DENTISTA`, `ROLE_RECEPCIONISTA` e `ROLE_PACIENTE`. O paciente não cria nem altera agendamentos: ele apenas consulta os próprios dados.
@@ -240,6 +244,11 @@ O sistema lê as seguintes variáveis de ambiente:
 | `RETORNO_LEMBRETE_ENABLED` | Sim | `true` para enviar lembretes de retorno; `false` para desativar |
 | `RETORNO_LEMBRETE_CRON` | Sim | Agendamento do lembrete (ex.: `0 0 9 * * *` = todo dia às 9h) |
 | `RETORNO_LEMBRETE_ZONE` | Sim | Fuso horário do agendamento (ex.: `America/Fortaleza`) |
+| `DENTISTA_INICIAL_NOME` | Primeira execução | Nome do primeiro dentista |
+| `DENTISTA_INICIAL_EMAIL` | Primeira execução | E-mail de login do primeiro dentista |
+| `DENTISTA_INICIAL_SENHA` | Primeira execução | Senha inicial (mínimo 6 caracteres; troque após o primeiro acesso) |
+| `DENTISTA_INICIAL_CRO` | Primeira execução | CRO no formato `12345-PB` |
+| `DENTISTA_INICIAL_ESPECIALIDADE` | Primeira execução | Especialidade |
 
 \* As variáveis da Z-API precisam existir para a aplicação iniciar, mas podem ficar vazias em desenvolvimento. Sem Z-API configurada, o envio de mensagens falha: a criação de agendamento salva o registro, mas pode responder com erro 500. Nunca versione valores reais dessas variáveis.
 
@@ -257,6 +266,11 @@ set ZAPI_INSTANCE=
 set ZAPI_TOKEN=
 set ZAPI_CLIENT_TOKEN=
 set RETORNO_LEMBRETE_ENABLED=false
+set DENTISTA_INICIAL_NOME=Nome do Dentista
+set DENTISTA_INICIAL_EMAIL=dentista@exemplo.com
+set DENTISTA_INICIAL_SENHA=defina_uma_senha
+set DENTISTA_INICIAL_CRO=12345-PB
+set DENTISTA_INICIAL_ESPECIALIDADE=Clinico Geral
 set RETORNO_LEMBRETE_CRON=0 0 9 * * *
 set RETORNO_LEMBRETE_ZONE=America/Fortaleza
 ```
@@ -273,6 +287,11 @@ export ZAPI_INSTANCE=
 export ZAPI_TOKEN=
 export ZAPI_CLIENT_TOKEN=
 export RETORNO_LEMBRETE_ENABLED=false
+export DENTISTA_INICIAL_NOME="Nome do Dentista"
+export DENTISTA_INICIAL_EMAIL=dentista@exemplo.com
+export DENTISTA_INICIAL_SENHA=defina_uma_senha
+export DENTISTA_INICIAL_CRO=12345-PB
+export DENTISTA_INICIAL_ESPECIALIDADE="Clínico Geral"
 export RETORNO_LEMBRETE_CRON="0 0 9 * * *"
 export RETORNO_LEMBRETE_ZONE=America/Fortaleza
 ```
@@ -306,6 +325,13 @@ ZAPI_CLIENT_TOKEN=
 
 # Opcionais no Docker (valores padrão: true, "0 0 9 * * *", America/Fortaleza)
 RETORNO_LEMBRETE_ENABLED=false
+
+# Primeira execução: conta do primeiro dentista
+DENTISTA_INICIAL_NOME=
+DENTISTA_INICIAL_EMAIL=
+DENTISTA_INICIAL_SENHA=
+DENTISTA_INICIAL_CRO=
+DENTISTA_INICIAL_ESPECIALIDADE=
 ```
 
 O arquivo `.env` contém segredos e não deve ser versionado.
@@ -394,7 +420,6 @@ Incluem testes das regras de negócio dos serviços (agendamentos, consultas, se
 
 ## Próximos passos
 
-  * Restringir o cadastro de profissionais ao perfil de dentista
   * Emissão de receituário
   * Relatórios gerenciais
   * Recuperação de senha
