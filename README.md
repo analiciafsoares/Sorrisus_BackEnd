@@ -60,6 +60,12 @@ Além de exigir login, alguns endpoints são restritos por perfil (`@PreAuthoriz
 | Criar, editar, confirmar, cancelar e excluir agendamentos | Dentista, Recepcionista |
 | Cadastrar e excluir dentistas, recepcionistas e usuários | Dentista |
 | Cadastrar pacientes | Dentista, Recepcionista |
+| Listar e excluir pacientes | Dentista, Recepcionista |
+| Consultar e editar um paciente (`/pacientes/{id}`) | Dentista, Recepcionista ou o próprio paciente |
+| Editar dentistas | Dentista |
+| Listar recepcionistas | Dentista |
+| Consultar e editar um recepcionista (`/recepcionistas/{id}`) | Dentista ou o próprio recepcionista |
+| Listar, consultar e editar usuários pela rota genérica (`/usuarios`) | Dentista |
 | Criar, editar e desativar serviços | Dentista, Recepcionista |
 | Registrar não comparecimento | Dentista, Recepcionista |
 | Finalizar atendimento | Dentista |

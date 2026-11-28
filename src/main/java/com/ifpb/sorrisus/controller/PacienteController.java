@@ -24,11 +24,13 @@ public class PacienteController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
     public List<Paciente> listarTodos() {
         return service.listarTodos();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA') or @acessoUsuario.ehOProprio(#id, authentication)")
     public ResponseEntity<Paciente> buscarPorId(@PathVariable Long id) {
         Paciente paciente = service.buscarPorId(id);
         return ResponseEntity.ok(paciente);
@@ -46,11 +48,13 @@ public class PacienteController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA') or @acessoUsuario.ehOProprio(#id, authentication)")
     public ResponseEntity<Paciente> atualizar(@PathVariable Long id, @RequestBody Paciente paciente) {
         return ResponseEntity.ok(service.atualizar(id, paciente));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_DENTISTA', 'ROLE_RECEPCIONISTA')")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();

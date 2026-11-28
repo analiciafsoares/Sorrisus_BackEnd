@@ -162,14 +162,51 @@ class UsuarioServiceTest {
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuarioBase));
         when(usuarioRepository.existsByEmail("maria.atualizada@sorrisus.com")).thenReturn(false);
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(passwordEncoder.encode("654321")).thenReturn("hash-654321");
 
         Usuario resultado = usuarioService.atualizar(1L, atualizado);
 
         assertThat(resultado.getNome()).isEqualTo("Maria Atualizada");
         assertThat(resultado.getEmail()).isEqualTo("maria.atualizada@sorrisus.com");
-        assertThat(resultado.getSenha()).isEqualTo("654321");
+        assertThat(resultado.getSenha()).isEqualTo("hash-654321");
         verify(usuarioRepository, times(1)).findById(1L);
         verify(usuarioRepository, times(1)).save(any(Usuario.class));
+    }
+
+    @Test
+    @DisplayName("Deve manter a senha atual ao atualizar usuário sem informar senha")
+    void deveManterSenhaAtualQuandoNaoInformada() {
+        usuarioBase.setSenha("hash-atual");
+        Usuario atualizado = new Usuario();
+        atualizado.setNome("Maria Souza");
+        atualizado.setEmail("maria@sorrisus.com");
+        atualizado.setRole(Role.ROLE_RECEPCIONISTA);
+
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuarioBase));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Usuario resultado = usuarioService.atualizar(1L, atualizado);
+
+        assertThat(resultado.getSenha()).isEqualTo("hash-atual");
+        verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    @DisplayName("Deve recusar senha curta ao atualizar usuário")
+    void deveRecusarSenhaCurtaAoAtualizar() {
+        Usuario atualizado = new Usuario();
+        atualizado.setNome("Maria Souza");
+        atualizado.setEmail("maria@sorrisus.com");
+        atualizado.setSenha("123");
+        atualizado.setRole(Role.ROLE_RECEPCIONISTA);
+
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuarioBase));
+
+        assertThatThrownBy(() -> usuarioService.atualizar(1L, atualizado))
+                .isInstanceOf(InvalidFieldException.class)
+                .hasMessageContaining("pelo menos 6 caracteres");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
     }
 
     @Test

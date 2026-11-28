@@ -46,6 +46,7 @@ public class DentistaController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_DENTISTA')")
     public ResponseEntity<Dentista> atualizar(@PathVariable Long id, @RequestBody Dentista dentista) {
         return ResponseEntity.ok(service.atualizar(id, dentista));
     }
