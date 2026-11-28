@@ -64,7 +64,13 @@ public class UsuarioService {
 
         existente.setNome(usuarioAtualizado.getNome());
         existente.setEmail(usuarioAtualizado.getEmail());
-        existente.setSenha(usuarioAtualizado.getSenha());
+        String novaSenha = usuarioAtualizado.getSenha();
+        if (novaSenha != null && !novaSenha.isBlank()) {
+            if (novaSenha.length() < 6) {
+                throw new InvalidFieldException("senha", "A senha deve ter pelo menos 6 caracteres.");
+            }
+            existente.setSenha(passwordEncoder.encode(novaSenha));
+        }
         existente.setRole(usuarioAtualizado.getRole());
 
         return usuarioRepository.save(existente);

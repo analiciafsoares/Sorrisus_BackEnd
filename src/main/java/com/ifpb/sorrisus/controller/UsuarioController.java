@@ -26,11 +26,13 @@ public class UsuarioController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_DENTISTA')")
     public List<Usuario> listarTodos() {
         return service.listarTodos();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_DENTISTA')")
     public ResponseEntity<Usuario> buscarPorId(@PathVariable Long id) {
         Usuario usuario = service.buscarPorId(id);
         return ResponseEntity.ok(usuario);
@@ -47,6 +49,7 @@ public class UsuarioController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_DENTISTA')")
     public ResponseEntity<Usuario> atualizar(@PathVariable Long id, @RequestBody Usuario usuario) {
         return ResponseEntity.ok(service.atualizar(id, usuario));
     }

@@ -24,11 +24,13 @@ public class RecepcionistaController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_DENTISTA')")
     public List<Recepcionista> listarTodos() {
         return service.listarTodos();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_DENTISTA') or @acessoUsuario.ehOProprio(#id, authentication)")
     public ResponseEntity<Recepcionista> buscarPorId(@PathVariable Long id) {
         Recepcionista recepcionista = service.buscarPorId(id);
         return ResponseEntity.ok(recepcionista);
@@ -46,6 +48,7 @@ public class RecepcionistaController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_DENTISTA') or @acessoUsuario.ehOProprio(#id, authentication)")
     public ResponseEntity<Recepcionista> atualizar(@PathVariable Long id, @RequestBody Recepcionista recepcionista) {
         return ResponseEntity.ok(service.atualizar(id, recepcionista));
     }
